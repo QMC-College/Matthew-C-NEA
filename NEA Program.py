@@ -26,7 +26,7 @@ wall1 = wall("wall.jpg", 25, 20, 20)
 wall1.place(20,20)
         
 class User(pygame.sprite.Sprite):
-    def __init__(self, image, width, height, startx, starty):
+    def __init__(self, image, width, height, startx, starty, lastx, lasty):
         super().__init__()
         self.__width = width
         self.__height = height
@@ -35,11 +35,14 @@ class User(pygame.sprite.Sprite):
         self.rect = self.__image.get_rect()
         self.rect.x = startx
         self.rect.y = starty
+        self.rect.x = lastx
+        self.rect.y = lasty
+        
         self.direction = "None"
 
     def draw(self):
         screen.blit(self.__image, (self.rect.x, self.rect.y))
-user = User('user.jpg', 20, 20, 0, 0)
+user = User('user.jpg', 20, 20, 0, 0,0,0)
 running = True
 while running:
     
@@ -67,6 +70,9 @@ while running:
         if event.type == pygame.KEYUP:
             user.direction = "None"
 
+    user.previous_x = user.rect.x 
+    user.previous_y = user.rect.y
+
     # Player Movement
     if user.direction == "Left":
         user.rect.x -= 3
@@ -79,6 +85,8 @@ while running:
         
     if user.direction == "Down":
         user.rect.y += 3
+
+
         
     spriteGroup = pygame.sprite.Group()
     spriteGroup.add(wall1)
@@ -86,8 +94,8 @@ while running:
     # Collision Detection
     collisions = pygame.sprite.spritecollide(user, spriteGroup, True)
     for i in collisions:
-          self.rect.x = self.previous_x
-          self.rect.y = self.previous_y
+          user.rect.x = user.previous_x
+          user.rect.y = user.previous_y
         
     # Draw shapes on the screen
     pygame.draw.rect(screen, (0,200,100), (400,300,200,100)) 
