@@ -43,112 +43,141 @@ for col in range(columns):
         column.append(cell)
     maze.append(column)
 stack = []
-# Wall class
-class Wall(pygame.sprite.Sprite):
-    def __init__(self, image, size, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load(image).convert_alpha(), (size, size))
-        self.rect = self.image.get_rect(topleft=(x, y))
 
-    def place(self):
-        screen.blit(self.image, self.rect.topleft)
+def neighbour(cell):
+    neighbours = []
+    x= cell.x
+    y= cell.y
+    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2), (0,1,2,0)]
+    for x_change, y_change, wall, opposite_wall in directions:
+        new_x = x + x_change
+        new_y = y + y_change
+
+        # Check if the new position is inside the maze
+        if 0 <= new_x < columns and 0 <= new_y < rows:
+            neighbour = maze[new_x][new_y]
+            if not neighbour.visited:
+                neighbours.append((neighbour, wall, opposite_wall))
+
+    return neighbours
+def generate_maze():
+    current = maze[0][0]
+    current.visited = True
+    stack.append(current)
+
+    while len(stack) > 0:
+        current = stack[-1]  # Look at the last cell in the stack
+        neighbours = neighbour(current)  # Find unvisited neighbors
+
+        if len(neighbours) > 0:
+            # Pick a random neighbor
+            next_cell, wall, opposite_wall = random.choice(neighbours)
+
+            # Remove the wall between current and next cell
+            current.walls[wall] = False
+            next_cell.walls[opposite_wall] = False
+
+            # Mark the next cell as visited and add it to the stack
+            next_cell.visited = True
+            stack.append(next_cell)
+        else:
+            stack.pop()
+generate_maze()
+
 
 # Finish class
 class Finish(pygame.sprite.Sprite):
-    def __init__(self, image, size, x, y):
+    def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load(image).convert_alpha(), (size, size))
-        self.rect = self.image.get_rect(topleft=(x, y))
+        self.image = pygame.transform.scale(pygame.image.load("apple.jpg").convert_alpha(), (CELL_SIZE, CELL_SIZE))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
 
-    def place(self):
-        screen.blit(self.image, self.rect.topleft)
+    def draw(self):
+        screen.blit(self.image, self.rect)
 
 # User class
 class User(pygame.sprite.Sprite):
-    def __init__(self, image, width, height, x, y):
+    def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load(image).convert_alpha(), (width, height))
-        self.rect = self.image.get_rect(topleft=(x, y))
+        self.image = pygame.transform.scale(pygame.image.load("user.jpg").convert_alpha(), (CELL_SIZE - 8, CELL_SIZE - 8))
+        self.rect = self.image.get_rect()
         self.direction = "None"
         self.prev_x = x
         self.prev_y = y
+        self.rect.topleft = (x + 4, y + 4)
+        self.grid_x = x // CELL_SIZE
+        self.grid_y = y // CELL_SIZE
 
-    def update(self):
-        self.prev_x, self.prev_y = self.rect.x, self.rect.y
-        if self.direction == "Left":
-            self.rect.x -= 3
-        elif self.direction == "Right":
-            self.rect.x += 3
-        elif self.direction == "Up":
-            self.rect.y -= 3
-        elif self.direction == "Down":
-            self.rect.y += 3
+    def move(self, x_change, y_change):
+        new_x = self.grid_x + x_change
+        new_y = self.grid_y + y_change
+        if 0 <= new_x < columns and 0 <= new_y < rows:
+            cell = maze[self.grid_x][self.grid_y]
+            if x_change == -1 and not cell.walls[3]:
+                self.grid_x = new_x
+            if x_change == 1 and not cell.walls[1]:
+                self.grid_x = new_x
+            if y_change == -1 and not cell.walls[0]:
+                self.grid_y = new_y
+            if y_change == 1 and not cell.walls[2]:
+                self.grid_y = new_y
 
-    def revert_position(self):
-        self.rect.x, self.rect.y = self.prev_x, self.prev_y
+            self.rect.topleft = (self.grid_x * CELL_SIZE + 4, self.grid_y * CELL_SIZE + 4)
+
+    
 
     def draw(self):
         screen.blit(self.image, self.rect.topleft)
 
-# Create instances
-walls = pygame.sprite.Group()
-wall_positions = [
-    (0, 0), (100, 0), (200, 0), (300, 0), (400, 0), (500, 0),
-    (0, 200), (0, 300), (0, 400), (0, 500),
-    (100, 500), (200, 500), (300, 500), (400, 500), (500, 500),
-    (500, 400), (500, 300), (500, 100),
-    (200, 200), (200, 300), (400, 300), (300, 0)
-]
-for pos in wall_positions:
-    walls.add(Wall("wall.jpg", 100, *pos))
 
-finish = Finish("apple.jpg", 100, 500, 200)
-user = User("user.jpg", 92, 92, 100, 200)
+
+user = User(0, 0)
+finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
 
 # Main loop
 running = True
 state = "game"
 
 while running:
+    screen.fill((100, 0, 100))
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            break
 
         if state == "game":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    user.direction = "Left"
+                    user.move(-1, 0)
                 elif event.key == pygame.K_RIGHT:
-                    user.direction = "Right"
+                    user.move(1, 0)
                 elif event.key == pygame.K_UP:
-                    user.direction = "Up"
+                    user.move(0, -1)
                 elif event.key == pygame.K_DOWN:
-                    user.direction = "Down"
-            elif event.type == pygame.KEYUP:
-                user.direction = "None"
+                    user.move(0, 1)
 
-    if state == "game":
-        screen.fill((100, 0, 255))
-        user.update()
+    # Draw Maze
+    for col in maze:
+        for cell in col:
+            cell.draw(screen)
 
-        # Collision with walls
-        if pygame.sprite.spritecollideany(user, walls):
-            user.revert_position()
+    # Draw Sprites
+    finish.draw()
+    user.draw()
 
-        # Collision with finish
-        if pygame.sprite.collide_rect(user, finish):
-            state = "menu"
+    # Win Condition
+    if user.rect.colliderect(finish.rect):
+        state = "menu"
 
-        # Draw everything
-        for wall in walls:
-            wall.place()
-        finish.place()
-        user.draw()
+    if state == "menu":
+        screen.fill((0, 200, 0))
+        font = pygame.font.SysFont(None, 60)
+        text = font.render("You Win!", True, (255, 255, 255))
+        screen.blit(text, (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 30))
 
-    elif state == "menu":
-        screen.fill((255, 0, 0))
-
-    pygame.display.update()
+    pygame.display.flip()
     clock.tick(60)
 
 pygame.quit()
