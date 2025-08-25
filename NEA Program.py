@@ -4,8 +4,8 @@ import sys
 
 pygame.init()
 # Screen setup
-SCREEN_WIDTH = 600
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 1000
 CELL_SIZE = 50
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
