@@ -1,11 +1,12 @@
 import pygame
 import random
 import sys
+import time
 
 pygame.init()
 # Screen setup
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 1000
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 500
 CELL_SIZE = 50
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
@@ -138,7 +139,8 @@ finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
 # Main loop
 running = True
 state = "game"
-
+start_time = time.time()
+count = 0
 while running:
     screen.fill((100, 0, 100))
 
@@ -171,12 +173,22 @@ while running:
     if user.rect.colliderect(finish.rect):
         state = "menu"
 
-    if state == "menu":
-        screen.fill((0, 200, 0))
-        font = pygame.font.SysFont(None, 60)
-        text = font.render("You Win!", True, (255, 255, 255))
-        screen.blit(text, (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 30))
 
+    if state == "menu":
+        
+        if count == 0:
+            end_time = time.time()
+            total_time = end_time - start_time
+            count+= 1
+        else:
+            screen.fill((0, 200, 0))
+            font = pygame.font.SysFont("Impact", 60)
+            text = font.render("You Win!", True, (255, 255, 255))
+            text2 = font.render(f"Total Time: {total_time:.3f}" , True, (255, 255, 255))
+            screen.blit(text, (SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT // 2 - 100))
+            screen.blit(text2, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 + 50))
+            
+       
     pygame.display.flip()
     clock.tick(60)
 
