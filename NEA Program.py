@@ -15,6 +15,24 @@ rows = SCREEN_HEIGHT // CELL_SIZE
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Algorithm Racer")
 clock = pygame.time.Clock()
+class Button():
+    def __init__(self, image , x, y, button_text):
+        self.image = image
+        self.x = x
+        self.y = y
+        self.rect = self.image.get_rect(centre=(self.x,self.y))
+        self.button_text = button_text
+        self.text = main_font.render(self.button_text, True, "white")
+        self.text_rect = self.text.get_rect(centre=(self.x,self.y))
+        def update(self):
+            screen.blit(self.image, self.rect)
+            screen.blit(self.text, self.text_rect)
+        def checkinput(self, pos):
+            if pos[0] in range(self.rect.left, self.rect.right) and pos[1] in range(self.rect.top, self.rect.bottom):
+                print("Pressed")
+start_surface = pygame.image.load("start.png")
+start_surface = pygame.transform.scale(start_surface, (400, 150))
+start_button = Button(start_surface, 400, 300, "Start")
 
 class CellinMaze:
     def __init__(self, x, y, size):
@@ -142,12 +160,18 @@ state = "game"
 start_time = time.time()
 count = 0
 while running:
+    
     screen.fill((100, 0, 100))
+    
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
             break
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            button.checkinput(pygame.mouse.get_pos())
+        button.update()
+        
 
         if state == "game":
             if event.type == pygame.KEYDOWN:
