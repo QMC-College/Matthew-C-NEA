@@ -5,12 +5,14 @@ import time
 
 pygame.init()
 # Screen setup
-SCREEN_WIDTH = 500
-SCREEN_HEIGHT = 500
+SCREEN_WIDTH = 700
+SCREEN_HEIGHT = 700
 CELL_SIZE = 50
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
-
+main_font = pygame.font.Font(None, 36)
+running = False
+state = "start"
 # Pygame setup
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Algorithm Racer")
@@ -20,19 +22,19 @@ class Button():
         self.image = image
         self.x = x
         self.y = y
-        self.rect = self.image.get_rect(centre=(self.x,self.y))
+        self.rect = self.image.get_rect(center=(self.x,self.y))
         self.button_text = button_text
         self.text = main_font.render(self.button_text, True, "white")
-        self.text_rect = self.text.get_rect(centre=(self.x,self.y))
+        self.text_rect = self.text.get_rect(center=(self.x,self.y))
         def update(self):
             screen.blit(self.image, self.rect)
             screen.blit(self.text, self.text_rect)
         def checkinput(self, pos):
             if pos[0] in range(self.rect.left, self.rect.right) and pos[1] in range(self.rect.top, self.rect.bottom):
                 print("Pressed")
-start_surface = pygame.image.load("start.png")
-start_surface = pygame.transform.scale(start_surface, (400, 150))
-start_button = Button(start_surface, 400, 300, "Start")
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
 
 class CellinMaze:
     def __init__(self, x, y, size):
@@ -151,11 +153,16 @@ class User(pygame.sprite.Sprite):
 
 
 
+
+
 user = User(0, 0)
 finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
-
+while running != True and state == "start":
+    screen.fill((0, 0, 255))
+    start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)), 400, 300, "Start")
+    start_button.draw()
 # Main loop
-running = True
+running = False
 state = "game"
 start_time = time.time()
 count = 0
@@ -168,9 +175,9 @@ while running:
         if event.type == pygame.QUIT:
             running = False
             break
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            button.checkinput(pygame.mouse.get_pos())
-        button.update()
+##        if event.type == pygame.MOUSEBUTTONDOWN:
+##            button.checkinput(pygame.mouse.get_pos())
+##        button.update()
         
 
         if state == "game":
@@ -192,6 +199,8 @@ while running:
     # Draw Sprites
     finish.draw()
     user.draw()
+    start_button.draw()
+    
 
     # Win Condition
     if user.rect.colliderect(finish.rect):
