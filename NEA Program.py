@@ -4,36 +4,39 @@ import sys
 import time
 
 pygame.init()
+
 # Screen setup
-SCREEN_WIDTH = 700
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 500
 CELL_SIZE = 50
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
 main_font = pygame.font.Font(None, 36)
 running = False
 state = "start"
+
 # Pygame setup
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Algorithm Racer")
 clock = pygame.time.Clock()
+
+
 class Button():
-    def __init__(self, image , x, y, button_text):
+    def __init__(self, image, x, y, button_text):
         self.image = image
         self.x = x
         self.y = y
-        self.rect = self.image.get_rect(center=(self.x,self.y))
+        self.rect = self.image.get_rect(center=(self.x, self.y))
         self.button_text = button_text
         self.text = main_font.render(self.button_text, True, "white")
-        self.text_rect = self.text.get_rect(center=(self.x,self.y))
-        def update(self):
-            screen.blit(self.image, self.rect)
-            screen.blit(self.text, self.text_rect)
-        def checkinput(self, pos):
-            if pos[0] in range(self.rect.left, self.rect.right) and pos[1] in range(self.rect.top, self.rect.bottom):
-                print("Pressed")
-    def draw(self):
+        self.text_rect = self.text.get_rect(center=(self.x, self.y))
+
+    def update(self):
         screen.blit(self.image, self.rect)
+        screen.blit(self.text, self.text_rect)
+
+    def checkinput(self, pos):
+        return self.rect.collidepoint(pos)
 
 
 class CellinMaze:
@@ -42,20 +45,21 @@ class CellinMaze:
         self.y = y
         self.size = size
         self.visited = False
-        self.walls = [True, True, True, True] #Checks all directionsfor neighbouring wall, in order Top, Right, Bottom, Left
+        self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
+
     def draw(self, surface):
-        x= self.x * self.size
-        y = self.y * self.size # Fits to screen size
-        # Check each direction for drawing, vectors created to show path and direction of travel
+        x = self.x * self.size
+        y = self.y * self.size
         if self.walls[0]:
             pygame.draw.line(surface, (255, 255, 255), (x, y), (x + self.size, y), 2)
         if self.walls[1]:
-            pygame.draw.line(surface,(255,255,255), (x+self.size, y), (x +self.size, y + self.size), 2)
+            pygame.draw.line(surface, (255, 255, 255), (x + self.size, y), (x + self.size, y + self.size), 2)
         if self.walls[2]:
-            pygame.draw.line(surface, (255,255,255), (x+self.size, y+self.size)  , (x, y+self.size), 2)
+            pygame.draw.line(surface, (255, 255, 255), (x + self.size, y + self.size), (x, y + self.size), 2)
         if self.walls[3]:
-            pygame.draw.line(surface, (255,255,255), (x,y+self.size), (x,y), 2)
-# Maze Generation
+            pygame.draw.line(surface, (255, 255, 255), (x, y + self.size), (x, y), 2)
+
+
 maze = []
 for col in range(columns):
     column = []
@@ -67,46 +71,38 @@ stack = []
 
 def neighbour(cell):
     neighbours = []
-    x= cell.x
-    y= cell.y
-    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2), (0,1,2,0)]
+    x = cell.x
+    y = cell.y
+    directions = [(-1, 0, 3, 1), (1, 0, 1, 3), (0, -1, 0, 2), (0, 1, 2, 0)]
     for x_change, y_change, wall, opposite_wall in directions:
         new_x = x + x_change
         new_y = y + y_change
-
-        # Check if the new position is inside the maze
         if 0 <= new_x < columns and 0 <= new_y < rows:
             neighbour = maze[new_x][new_y]
             if not neighbour.visited:
                 neighbours.append((neighbour, wall, opposite_wall))
-
     return neighbours
+
 def generate_maze():
     current = maze[0][0]
     current.visited = True
     stack.append(current)
 
     while len(stack) > 0:
-        current = stack[-1]  # Look at the last cell in the stack
-        neighbours = neighbour(current)  # Find unvisited neighbors
-
+        current = stack[-1]
+        neighbours = neighbour(current)
         if len(neighbours) > 0:
-            # Pick a random neighbor
             next_cell, wall, opposite_wall = random.choice(neighbours)
-
-            # Remove the wall between current and next cell
             current.walls[wall] = False
             next_cell.walls[opposite_wall] = False
-
-            # Mark the next cell as visited and add it to the stack
             next_cell.visited = True
             stack.append(next_cell)
         else:
             stack.pop()
+
 generate_maze()
 
 
-# Finish class
 class Finish(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -117,15 +113,11 @@ class Finish(pygame.sprite.Sprite):
     def draw(self):
         screen.blit(self.image, self.rect)
 
-# User class
 class User(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         self.image = pygame.transform.scale(pygame.image.load("user.jpg").convert_alpha(), (CELL_SIZE - 8, CELL_SIZE - 8))
         self.rect = self.image.get_rect()
-        self.direction = "None"
-        self.prev_x = x
-        self.prev_y = y
         self.rect.topleft = (x + 4, y + 4)
         self.grid_x = x // CELL_SIZE
         self.grid_y = y // CELL_SIZE
@@ -143,43 +135,46 @@ class User(pygame.sprite.Sprite):
                 self.grid_y = new_y
             if y_change == 1 and not cell.walls[2]:
                 self.grid_y = new_y
-
             self.rect.topleft = (self.grid_x * CELL_SIZE + 4, self.grid_y * CELL_SIZE + 4)
-
-    
 
     def draw(self):
         screen.blit(self.image, self.rect.topleft)
 
 
-
-
-
 user = User(0, 0)
 finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
-while running != True and state == "start":
-    screen.fill((0, 0, 255))
-    start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)), 400, 300, "Start")
-    start_button.draw()
-# Main loop
-running = False
-state = "game"
-start_time = time.time()
-count = 0
-while running:
-    
-    screen.fill((100, 0, 100))
-    
 
+start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)),
+                      SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, "")
+
+play_again_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)),
+                           SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 0.3*SCREEN_HEIGHT, "")
+
+
+while state == "start":
+    screen.fill((0, 0, 255))
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if start_button.checkinput(pygame.mouse.get_pos()):
+                state = "game"
+                running = True
+                start_time = time.time()
+
+    start_button.update()
+    pygame.display.flip()
+    clock.tick(60)
+
+
+
+while running:
+    screen.fill((100, 0, 100))
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
             break
-##        if event.type == pygame.MOUSEBUTTONDOWN:
-##            button.checkinput(pygame.mouse.get_pos())
-##        button.update()
-        
-
         if state == "game":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
@@ -190,38 +185,45 @@ while running:
                     user.move(0, -1)
                 elif event.key == pygame.K_DOWN:
                     user.move(0, 1)
+        elif state == "menu":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_again_button.checkinput(pygame.mouse.get_pos()):
+                    # Reset everything for a new game
+                    maze.clear()
+                    for col in range(columns):
+                        column = []
+                        for row in range(rows):
+                            cell = CellinMaze(col, row, CELL_SIZE)
+                            column.append(cell)
+                        maze.append(column)
+                    generate_maze()
+                    user = User(0, 0)
+                    finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
+                    start_time = time.time()
+                    state = "game"
 
-    # Draw Maze
-    for col in maze:
-        for cell in col:
-            cell.draw(screen)
+    if state == "game":
+        for col in maze:
+            for cell in col:
+                cell.draw(screen)
 
-    # Draw Sprites
-    finish.draw()
-    user.draw()
-    start_button.draw()
-    
+        finish.draw()
+        user.draw()
 
-    # Win Condition
-    if user.rect.colliderect(finish.rect):
-        state = "menu"
-
-
-    if state == "menu":
-        
-        if count == 0:
+        if user.rect.colliderect(finish.rect):
+            state = "menu"
             end_time = time.time()
             total_time = end_time - start_time
-            count+= 1
-        else:
-            screen.fill((0, 200, 0))
-            font = pygame.font.SysFont("Impact", 60)
-            text = font.render("You Win!", True, (255, 255, 255))
-            text2 = font.render(f"Total Time: {total_time:.3f}" , True, (255, 255, 255))
-            screen.blit(text, (SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT // 2 - 100))
-            screen.blit(text2, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 + 50))
-            
-       
+
+    elif state == "menu":
+        screen.fill((0, 200, 0))
+        font = pygame.font.SysFont("Impact", 60)
+        text = font.render("You Win!", True, (255, 255, 255))
+        text2 = font.render(f"Total Time: {total_time:.3f}", True, (255, 255, 255))
+        screen.blit(text, (SCREEN_WIDTH // 2 - 0.18*SCREEN_WIDTH, SCREEN_HEIGHT // 2 - 0.4*SCREEN_HEIGHT))
+        screen.blit(text2, (SCREEN_WIDTH // 2 - 0.31*SCREEN_WIDTH, SCREEN_HEIGHT // 2 -0.1*SCREEN_HEIGHT))
+        play_again_button.update()
+
     pygame.display.flip()
     clock.tick(60)
 
