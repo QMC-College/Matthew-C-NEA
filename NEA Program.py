@@ -6,8 +6,8 @@ import time
 pygame.init()
 
 # Screen setup
-SCREEN_WIDTH = 500
-SCREEN_HEIGHT = 500
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 400
 CELL_SIZE = 50
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
@@ -60,14 +60,9 @@ class CellinMaze:
             pygame.draw.line(surface, (255, 255, 255), (x, y + self.size), (x, y), 2)
 
 
-maze = []
-for col in range(columns):
-    column = []
-    for row in range(rows):
-        cell = CellinMaze(col, row, CELL_SIZE)
-        column.append(cell)
-    maze.append(column)
+maze = [[CellinMaze(col, row, CELL_SIZE) for row in range(rows)] for col in range(columns)]
 stack = []
+
 
 def neighbour(cell):
     neighbours = []
@@ -83,15 +78,16 @@ def neighbour(cell):
                 neighbours.append((neighbour, wall, opposite_wall))
     return neighbours
 
+
 def generate_maze():
     current = maze[0][0]
     current.visited = True
     stack.append(current)
 
-    while len(stack) > 0:
+    while stack:
         current = stack[-1]
         neighbours = neighbour(current)
-        if len(neighbours) > 0:
+        if neighbours:
             next_cell, wall, opposite_wall = random.choice(neighbours)
             current.walls[wall] = False
             next_cell.walls[opposite_wall] = False
@@ -100,7 +96,51 @@ def generate_maze():
         else:
             stack.pop()
 
+
 generate_maze()
+
+
+class TextBox:
+    def __init__(self, x, y, w, h, font, max_length=12):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.color_inactive = (180, 180, 180)
+        self.color_active = (255, 255, 255)
+        self.color = self.color_inactive
+        self.font = font
+        self.text = ""
+        self.active = False
+        self.max_length = max_length
+        self.submitted = False
+
+    def handle_event(self, event):
+        if self.submitted:
+            return None
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = self.rect.collidepoint(event.pos)
+            self.color = self.color_active if self.active else self.color_inactive
+
+        if event.type == pygame.KEYDOWN and self.active:
+            if event.key == pygame.K_RETURN:
+                self.submitted = True
+                self.active = False
+                return self.text
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif len(self.text) < self.max_length:
+                self.text += event.unicode
+        return None
+
+    def draw(self, screen):
+        txt_surface = self.font.render(self.text, True, (0, 0, 0))
+        width = max(self.rect.w, txt_surface.get_width() + 10)
+        self.rect.w = width
+        screen.blit(txt_surface, (self.rect.x + 5, self.rect.y + 5))
+        pygame.draw.rect(screen, self.color, self.rect, 2)
+
+
+def text_file(name, time):
+    with open("leaderboard.txt", "a") as leaders:
+        leaders.write(f"{name},{time:.3f}\n")
 
 
 class Finish(pygame.sprite.Sprite):
@@ -112,6 +152,7 @@ class Finish(pygame.sprite.Sprite):
 
     def draw(self):
         screen.blit(self.image, self.rect)
+
 
 class User(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -147,9 +188,11 @@ finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
 start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)),
                       SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, "")
 
-play_again_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)),
-                           SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 0.3*SCREEN_HEIGHT, "")
+play_again_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (250, 80)),
+    SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40, "")
 
+leaderboard_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (250, 80)),
+    SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140, "")
 
 while state == "start":
     screen.fill((0, 0, 255))
@@ -167,7 +210,7 @@ while state == "start":
     pygame.display.flip()
     clock.tick(60)
 
-
+name_submitted = False
 
 while running:
     screen.fill((100, 0, 100))
@@ -186,43 +229,66 @@ while running:
                 elif event.key == pygame.K_DOWN:
                     user.move(0, 1)
         elif state == "menu":
+            result = name_box.handle_event(event)
+            if result is not None:
+                player_name = result if result.strip() != "" else "Anonymous"
+                text_file(player_name, total_time)
+                name_submitted = True
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if play_again_button.checkinput(pygame.mouse.get_pos()):
-                    # Reset everything for a new game
-                    maze.clear()
-                    for col in range(columns):
-                        column = []
-                        for row in range(rows):
-                            cell = CellinMaze(col, row, CELL_SIZE)
-                            column.append(cell)
-                        maze.append(column)
+                    maze = [[CellinMaze(col, row, CELL_SIZE) for row in range(rows)] for col in range(columns)]
                     generate_maze()
                     user = User(0, 0)
                     finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
                     start_time = time.time()
                     state = "game"
+                elif leaderboard_button.checkinput(pygame.mouse.get_pos()):
+                    state = "leaderboard"
 
     if state == "game":
         for col in maze:
             for cell in col:
                 cell.draw(screen)
-
         finish.draw()
         user.draw()
-
         if user.rect.colliderect(finish.rect):
             state = "menu"
             end_time = time.time()
             total_time = end_time - start_time
+            font = pygame.font.SysFont("Arial", 40)
+            name_box = TextBox(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 60, 200, 50, font)
 
     elif state == "menu":
         screen.fill((0, 200, 0))
-        font = pygame.font.SysFont("Impact", 60)
-        text = font.render("You Win!", True, (255, 255, 255))
-        text2 = font.render(f"Total Time: {total_time:.3f}", True, (255, 255, 255))
-        screen.blit(text, (SCREEN_WIDTH // 2 - 0.18*SCREEN_WIDTH, SCREEN_HEIGHT // 2 - 0.4*SCREEN_HEIGHT))
-        screen.blit(text2, (SCREEN_WIDTH // 2 - 0.31*SCREEN_WIDTH, SCREEN_HEIGHT // 2 -0.1*SCREEN_HEIGHT))
+        font_big = pygame.font.SysFont("Impact", 60)
+        font_small = pygame.font.SysFont("Arial", 40)
+
+        text = font_big.render("You Win!", True, (255, 255, 255))
+        text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 200))
+        screen.blit(text, text_rect)
+
+        text2 = font_small.render(f"Total Time: {total_time:.3f}", True, (255, 255, 255))
+        text2_rect = text2.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 140))
+        screen.blit(text2, text2_rect)
+
+        name_box.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60)
+        name_box.draw(screen)
+
+        play_again_button.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)
+        play_again_button.text_rect.center = play_again_button.rect.center
         play_again_button.update()
+
+        leaderboard_button.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140)
+        leaderboard_button.text_rect.center = leaderboard_button.rect.center
+        leaderboard_button.update()
+
+        if not name_submitted:
+            result = name_box.handle_event(event)
+            if result is not None:
+                player_name = result if result.strip() != "" else "Anonymous"
+                text_file(player_name, total_time)
+                name_submitted = True
 
     pygame.display.flip()
     clock.tick(60)
