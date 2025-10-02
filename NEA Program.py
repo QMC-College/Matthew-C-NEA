@@ -188,10 +188,10 @@ finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
 start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400, 150)),
                       SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, "")
 
-play_again_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (250, 80)),
+play_again_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (250, 80)),
     SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40, "")
 
-leaderboard_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (250, 80)),
+leaderboard_button = Button(pygame.transform.scale(pygame.image.load("scores.png").convert_alpha(), (250, 80)),
     SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140, "")
 
 while state == "start":
