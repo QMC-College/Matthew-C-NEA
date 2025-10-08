@@ -143,6 +143,28 @@ def text_file(name, time):
         leaders.write(f"{name},{time:.3f}\n")
 
 
+def read_leaderboard():
+    scores = []
+    try:
+        with open("leaderboard.txt", "r") as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(",")
+                if len(parts) != 2:
+                    continue
+                name, time_str = parts
+                try:
+                    scores.append((name, float(time_str)))
+                except ValueError:
+                    continue
+        scores.sort(key=lambda x: x[1])
+    except FileNotFoundError:
+        pass
+    return scores
+
+
 class Finish(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -189,10 +211,13 @@ start_button = Button(pygame.transform.scale(pygame.image.load("start.png").conv
                       SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, "")
 
 play_again_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (250, 80)),
-    SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40, "")
+                           SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40, "")
 
 leaderboard_button = Button(pygame.transform.scale(pygame.image.load("scores.png").convert_alpha(), (250, 80)),
-    SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140, "")
+                            SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140, "")
+
+back_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (200, 70)),
+                     SCREEN_WIDTH // 2, SCREEN_HEIGHT - 60, "")
 
 while state == "start":
     screen.fill((0, 0, 255))
@@ -245,6 +270,10 @@ while running:
                     state = "game"
                 elif leaderboard_button.checkinput(pygame.mouse.get_pos()):
                     state = "leaderboard"
+        elif state == "leaderboard":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if back_button.checkinput(pygame.mouse.get_pos()):
+                    state = "start"
 
     if state == "game":
         for col in maze:
@@ -289,6 +318,34 @@ while running:
                 player_name = result if result.strip() != "" else "Anonymous"
                 text_file(player_name, total_time)
                 name_submitted = True
+
+    elif state == "leaderboard":
+        screen.fill((0, 0, 0))
+        font_title = pygame.font.SysFont("Impact", 60)
+        font_entry = pygame.font.SysFont("Arial", 30)
+
+        title = font_title.render("Leaderboard", True, (255, 215, 0))
+        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, 50)))
+
+        y_offset = 120
+        scores = read_leaderboard()
+
+        if len(scores) == 0:
+            text = font_entry.render("No scores yet!", True, (255, 255, 255))
+            screen.blit(text, (100, y_offset))
+        else:
+            count = 0
+            for score in scores:
+                name = score[0]
+                time_val = score[1]
+                count += 1
+                text = font_entry.render(str(count) + ". " + name + " - " + str(round(time_val, 3)) + "s", True, (255, 255, 255))
+                screen.blit(text, (50, y_offset))
+                y_offset += 35
+                if count == 10:
+                    break
+
+        back_button.update()
 
     pygame.display.flip()
     clock.tick(60)
