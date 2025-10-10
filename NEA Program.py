@@ -4,7 +4,7 @@ import sys
 import time
 
 pygame.init()
-
+start_time = 0
 # Screen setup
 SCREEN_WIDTH = 400
 SCREEN_HEIGHT = 400
@@ -216,7 +216,7 @@ play_again_button = Button(pygame.transform.scale(pygame.image.load("replay.png"
 leaderboard_button = Button(pygame.transform.scale(pygame.image.load("scores.png").convert_alpha(), (250, 80)),
                             SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 140, "")
 
-back_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (200, 70)),
+back_button = Button(pygame.transform.scale(pygame.image.load("menu.png").convert_alpha(), (200, 70)),
                      SCREEN_WIDTH // 2, SCREEN_HEIGHT - 60, "")
 
 while state == "start":
@@ -229,7 +229,6 @@ while state == "start":
             if start_button.checkinput(pygame.mouse.get_pos()):
                 state = "game"
                 running = True
-                start_time = time.time()
 
     start_button.update()
     pygame.display.flip()
@@ -245,6 +244,8 @@ while running:
             break
         if state == "game":
             if event.type == pygame.KEYDOWN:
+                if start_time == 0:
+                    start_time = time.time()
                 if event.key == pygame.K_LEFT:
                     user.move(-1, 0)
                 elif event.key == pygame.K_RIGHT:
@@ -266,14 +267,13 @@ while running:
                     generate_maze()
                     user = User(0, 0)
                     finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
-                    start_time = time.time()
                     state = "game"
                 elif leaderboard_button.checkinput(pygame.mouse.get_pos()):
                     state = "leaderboard"
         elif state == "leaderboard":
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if back_button.checkinput(pygame.mouse.get_pos()):
-                    state = "start"
+                    state = "menu"
 
     if state == "game":
         for col in maze:
