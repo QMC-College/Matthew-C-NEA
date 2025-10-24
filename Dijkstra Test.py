@@ -29,10 +29,10 @@ def dijkstra(graph, start, end):
 
 
 graph = {
-    'A': {'B': 1, 'C': 4},
-    'B': {'A': 1, 'C': 2, 'D': 5},
-    'C': {'A': 4, 'B': 2, 'D': 1},
-    'D': {'B': 5, 'C': 1}
+    'A': {'B': 6, 'C': 4},
+    'B': {'A': 6, 'C': 12, 'D': 5},
+    'C': {'A': 4, 'B': 12, 'D': 7},
+    'D': {'B': 5, 'C': 7}
 }
 
 shortest_path = dijkstra(graph, 'A', 'D')

@@ -2,13 +2,15 @@ import pygame
 import random
 import sys
 import time
+import heapq
 
 pygame.init()
 start_time = 0
+
 # Screen setup
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 400
-CELL_SIZE = 50
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 800
+CELL_SIZE = 80
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
 main_font = pygame.font.Font(None, 36)
@@ -62,6 +64,7 @@ class CellinMaze:
 
 maze = [[CellinMaze(col, row, CELL_SIZE) for row in range(rows)] for col in range(columns)]
 stack = []
+
 
 
 def neighbour(cell):
@@ -138,9 +141,10 @@ class TextBox:
         pygame.draw.rect(screen, self.color, self.rect, 2)
 
 
-def text_file(name, time):
+def text_file(name, time,count):
     with open("leaderboard.txt", "a") as leaders:
         leaders.write(f"{name},{time:.3f}\n")
+                
 
 
 def read_leaderboard():
@@ -260,7 +264,7 @@ while running:
             result = name_box.handle_event(event)
             if result is not None:
                 player_name = result if result.strip() != "" else "Anonymous"
-                text_file(player_name, total_time)
+                text_file(player_name, total_time,0)
                 name_submitted = True
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -270,6 +274,7 @@ while running:
                     user = User(0, 0)
                     finish = Finish((columns - 1) * CELL_SIZE, (rows - 1) * CELL_SIZE)
                     state = "game"
+                    start_time = 0
                 elif leaderboard_button.checkinput(pygame.mouse.get_pos()):
                     state = "leaderboard"
         elif state == "leaderboard":
@@ -318,7 +323,7 @@ while running:
             result = name_box.handle_event(event)
             if result is not None:
                 player_name = result if result.strip() != "" else "Anonymous"
-                text_file(player_name, total_time)
+                text_file(player_name, total_time,0)
                 name_submitted = True
 
     elif state == "leaderboard":
@@ -330,6 +335,7 @@ while running:
         screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, 50)))
 
         y_offset = 120
+        
         scores = read_leaderboard()
 
         if len(scores) == 0:
@@ -341,10 +347,10 @@ while running:
                 name = score[0]
                 time_val = score[1]
                 count += 1
-                text = font_entry.render(str(count) + ". " + name + " - " + str(round(time_val, 3)) + "s", True, (255, 255, 255))
+                text = font_entry.render(str(count) + ". " + name + " - " + str(round(time_val, 3)) + " s", True, (255, 255, 255))
                 screen.blit(text, (50, y_offset))
                 y_offset += 35
-                if count == 10:
+                if count == 15:
                     break
 
         back_button.update()
