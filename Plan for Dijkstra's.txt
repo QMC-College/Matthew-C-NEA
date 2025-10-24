@@ -1,0 +1,31 @@
+Plan to Integrate Dijkstra's Algorithm into Maze Game
+
+Step 1: Represent the Maze as a Graph
+
+Treat each cell as a node.
+
+Identify accessible neighbors by checking cell walls.
+
+Store the neighbors and movement cost in a graph structure.
+
+Step 2: Implement Dijkstra’s Algorithm
+
+Use a priority queue to track nodes and distance.
+
+Maintain a set to avoid revisiting nodes.
+
+Track older for path reconstruction.
+
+Start from the player’s position (top left) and calculate shortest path to the finish.
+
+Step 3: Reconstruct the Shortest Path
+
+After the algorithm finishes, trace back from the goal to the start using older.
+
+Store this path as a sequence of cell coordinates.
+
+Step 4: Integrate Path Drawing into the Game
+
+Draw the path visually on the screen, using coordinates from the shortest path.
+
+Update the path as the player moves, recalculating position dist to the finish.
