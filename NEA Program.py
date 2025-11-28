@@ -7,7 +7,7 @@ import heapq
 pygame.init()
 start_time = 0
 
-# ---------------- Screen setup ----------------
+#Screen setup
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 CELL_SIZE = 80
@@ -19,7 +19,7 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Algorithm Racer")
 clock = pygame.time.Clock()
 
-# ---------------- Game state ----------------
+#Game state
 running = True
 state = "start"
 name_submitted = False
@@ -27,12 +27,12 @@ current_algorithm = None
 winner = None
 total_time = 0
 
-# ---------------- Algorithm delays (frames) ----------------
+#Algorithm delays (frames)
 DFS_DELAY = 15
 BFS_DELAY = 15
 DIJKSTRA_DELAY = 15
 
-# ---------------- Classes ----------------
+#Classes
 class Button():
     def __init__(self, image, x, y, button_text):
         self.image = image
@@ -69,8 +69,7 @@ class CellinMaze:
 
 class User(pygame.sprite.Sprite):
     def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("user.jpg").convert_alpha(), (CELL_SIZE-8, CELL_SIZE-8))
+        self.image = pygame.transform.scale(pygame.image.load("images/user.jpg").convert_alpha(), (CELL_SIZE-8, CELL_SIZE-8))
         self.rect = self.image.get_rect()
         self.rect.topleft = (x+4, y+4)
         self.grid_x = x // CELL_SIZE
@@ -94,8 +93,7 @@ class User(pygame.sprite.Sprite):
 
 class Finish(pygame.sprite.Sprite):
     def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load("apple.jpg").convert_alpha(), (CELL_SIZE, CELL_SIZE))
+        self.image = pygame.transform.scale(pygame.image.load("images/apple.jpg").convert_alpha(), (CELL_SIZE, CELL_SIZE))
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
     def draw(self):
@@ -138,7 +136,7 @@ class TextBox:
         screen.blit(txt_surface, (self.rect.x+5, self.rect.y+5))
         pygame.draw.rect(screen, self.color, self.rect, 2)
 
-# ---------------- Maze generation ----------------
+#Maze generation
 maze = []
 for x in range(columns):
     column = []
@@ -180,7 +178,7 @@ def generate_maze():
 
 generate_maze()
 
-# ---------------- Leaderboard ----------------
+#Leaderboard
 def text_file(name, time_value):
     with open("leaderboard.txt", "a") as f:
         f.write(f"{name},{time_value:.3f}\n")
@@ -202,7 +200,7 @@ def read_leaderboard():
         pass
     return scores
 
-# ---------------- Algorithm Racer ----------------
+#Algorithm Racer
 class AlgorithmRacer:
     def __init__(self, algo, start_cell, goal_cell):
         self.algo = algo
@@ -281,9 +279,9 @@ class AlgorithmRacer:
 
     def draw(self):
         for cell in self.visited:
-            pygame.draw.rect(screen,(0,0,255),(cell.x*CELL_SIZE+10, cell.y*CELL_SIZE+10, CELL_SIZE-20, CELL_SIZE-20))
+            pygame.draw.rect(screen,(0,255,255),(cell.x*CELL_SIZE+10, cell.y*CELL_SIZE+10, CELL_SIZE-20, CELL_SIZE-20))
         for cell in self.path:
-            pygame.draw.rect(screen,(255,255,0),(cell.x*CELL_SIZE+20, cell.y*CELL_SIZE+20, CELL_SIZE-40, CELL_SIZE-40))
+            pygame.draw.rect(screen,(255,0,0),(cell.x*CELL_SIZE+20, cell.y*CELL_SIZE+20, CELL_SIZE-40, CELL_SIZE-40))
 
 def get_neighbors(cell):
     x, y = cell.x, cell.y
@@ -297,18 +295,18 @@ def get_neighbors(cell):
                 neighbors.append(maze[nx][ny])
     return neighbors
 
-# ---------------- Buttons ----------------
-start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400,150)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2, "")
-play_again_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 40, "")
-leaderboard_button = Button(pygame.transform.scale(pygame.image.load("scores.png").convert_alpha(), (250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 140, "")
-back_button = Button(pygame.transform.scale(pygame.image.load("menu.png").convert_alpha(), (200,70)), SCREEN_WIDTH//2, SCREEN_HEIGHT - 60, "")
+#Buttons
+start_button = Button(pygame.transform.scale(pygame.image.load("images/start.png").convert_alpha(), (400,150)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2, "")
+play_again_button = Button(pygame.transform.scale(pygame.image.load("images/replay.png").convert_alpha(), (250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 40, "")
+leaderboard_button = Button(pygame.transform.scale(pygame.image.load("images/scores.png").convert_alpha(), (250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 140, "")
+back_button = Button(pygame.transform.scale(pygame.image.load("images/menu.png").convert_alpha(), (200,70)), SCREEN_WIDTH//2, SCREEN_HEIGHT - 60, "")
 
-# ---------------- Initialize User/Finish ----------------
+#Initialize User/Finish
 user = User(0,0)
 finish = Finish((columns-1)*CELL_SIZE,(rows-1)*CELL_SIZE)
 name_box = TextBox(SCREEN_WIDTH//2-100, SCREEN_HEIGHT//2+60, 200,50,pygame.font.SysFont("Arial",40))
 
-# ---------------- Start Screen ----------------
+#Start Screen
 while state == "start":
     screen.fill((0,0,255))
     for event in pygame.event.get():
@@ -322,7 +320,7 @@ while state == "start":
     pygame.display.flip()
     clock.tick(60)
 
-# ---------------- Algorithm Selection ----------------
+#Algorithm Selection
 dfs_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2-100, "DFS")
 bfs_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2, "BFS")
 dijkstra_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2+100, "Dijkstra")
@@ -350,11 +348,11 @@ while state == "algorithm_select":
     pygame.display.flip()
     clock.tick(60)
 
-# ---------------- Initialize Racer ----------------
+#Initialize Racer
 racer = AlgorithmRacer(current_algorithm, maze[0][0], maze[columns-1][rows-1])
 start_time = 0
 
-# ---------------- Main Loop ----------------
+#Main Loop
 while running:
 
     # Event Handling
@@ -403,7 +401,7 @@ while running:
                 if back_button.checkinput(pygame.mouse.get_pos()):
                     state = "menu"
 
-    # ---------------- Race Logic ----------------
+    #Race Logic
     if state == "race":
         screen.fill((0,0,0))
         for x in range(columns):
@@ -424,7 +422,7 @@ while running:
             total_time = time.time() - start_time
             state = "menu"
 
-    # ---------------- Menu ----------------
+    #Menu
     elif state == "menu":
         screen.fill((0,200,0))
         font_big = pygame.font.SysFont("Impact", 60)
@@ -436,7 +434,7 @@ while running:
         play_again_button.update()
         leaderboard_button.update()
 
-    # ---------------- Leaderboard ----------------
+    #Leaderboard
     elif state == "leaderboard":
         screen.fill((0,0,0))
         font_title = pygame.font.SysFont("Impact",60)
