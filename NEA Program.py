@@ -28,8 +28,8 @@ winner = None
 total_time = 0
 
 #Algorithm delays (frames)
-DFS_DELAY = 15
-BFS_DELAY = 15
+DFS_DELAY = 10
+BFS_DELAY = 10
 DIJKSTRA_DELAY = 15
 
 #Classes
