@@ -5,270 +5,238 @@ import time
 import heapq
 
 pygame.init()
-start_time = 0
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 CELL_SIZE = 80
 columns = SCREEN_WIDTH // CELL_SIZE
 rows = SCREEN_HEIGHT // CELL_SIZE
-main_font = pygame.font.Font(None, 36)
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Algorithm Racer")
 clock = pygame.time.Clock()
 
+main_font = pygame.font.Font(None, 50)
+font_small = pygame.font.SysFont("Arial", 32)
+font_big = pygame.font.SysFont("Impact", 60)
+
 running = True
 state = "start"
-name_submitted = False
+
 current_algorithm = None
+algorithm_selected = False
+difficulty_selected = False
+delay = 30
+
 winner = None
+start_time = 0
 total_time = 0
+just_started = False
+player_name = ""
+name_active = False
+name_submitted = False
 
-DFS_DELAY = 15
-BFS_DELAY = 15
-DIJKSTRA_DELAY = 15
+# ---------------- LEADERBOARD ----------------
 
-
-# ---------------- GUI CLASSES ----------------
-
-class Button():
-    def __init__(self, image, x, y, button_text):
-        self.image = image
-        self.x = x
-        self.y = y
-        self.rect = self.image.get_rect(center=(self.x, self.y))
-        self.button_text = button_text
-        self.text = main_font.render(self.button_text, True, "white")
-        self.text_rect = self.text.get_rect(center=(self.x, self.y))
-
-    def update(self):
-        screen.blit(self.image, self.rect)
-        screen.blit(self.text, self.text_rect)
-
-    def checkinput(self, pos):
-        return self.rect.collidepoint(pos)
-
-
-class TextBox:
-    def __init__(self, x, y, w, h, font, max_length=12):
-        self.rect = pygame.Rect(x, y, w, h)
-        self.color_inactive = (180, 180, 180)
-        self.color_active = (255, 255, 255)
-        self.color = self.color_inactive
-        self.font = font
-        self.text = ""
-        self.active = False
-        self.max_length = max_length
-        self.submitted = False
-
-    def handle_event(self, event):
-        if self.submitted:
-            return None
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            self.active = self.rect.collidepoint(event.pos)
-            self.color = self.color_active if self.active else self.color_inactive
-        if event.type == pygame.KEYDOWN and self.active:
-            if event.key == pygame.K_RETURN:
-                self.submitted = True
-                self.active = False
-                return self.text
-            elif event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
-            elif len(self.text) < self.max_length:
-                self.text += event.unicode
-        return None
-
-    def draw(self):
-        txt_surface = self.font.render(self.text, True, (0,0,0))
-        self.rect.w = max(self.rect.w, txt_surface.get_width()+10)
-        screen.blit(txt_surface, (self.rect.x+5, self.rect.y+5))
-        pygame.draw.rect(screen, self.color, self.rect, 2)
-
-
-# ---------------- MAZE ----------------
-
-class MazeCell:
-    def __init__(self, x, y, size):
-        self.x = x
-        self.y = y
-        self.size = size
-        self.visited = False
-        self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
-
-    def draw(self, surface):
-        px = self.x * self.size
-        py = self.y * self.size
-        if self.walls[0]:
-            pygame.draw.line(surface, (255,255,255), (px, py), (px+self.size, py), 2)
-        if self.walls[1]:
-            pygame.draw.line(surface, (255,255,255), (px+self.size, py), (px+self.size, py+self.size), 2)
-        if self.walls[2]:
-            pygame.draw.line(surface, (255,255,255), (px+self.size, py+self.size), (px, py+self.size), 2)
-        if self.walls[3]:
-            pygame.draw.line(surface, (255,255,255), (px, py+self.size), (px, py), 2)
-
-
-maze = []
-for x in range(columns):
-    column = []
-    for y in range(rows):
-        column.append(MazeCell(x, y, CELL_SIZE))
-    maze.append(column)
-
-stack = []
-
-
-def neighbour(cell):
-    neighbours = []
-    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]
-    for dx, dy, wall, opp in directions:
-        nx = cell.x + dx
-        ny = cell.y + dy
-        if 0 <= nx < columns and 0 <= ny < rows:
-            next_cell = maze[nx][ny]
-            if not next_cell.visited:
-                neighbours.append((next_cell, wall, opp))
-    return neighbours
-
-
-def generate_maze():
-    current = maze[0][0]
-    current.visited = True
-    stack.append(current)
-    while stack:
-        current = stack[-1]
-        n = neighbour(current)
-        if n:
-            next_cell, wall, opp = random.choice(n)
-            current.walls[wall] = False
-            next_cell.walls[opp] = False
-            next_cell.visited = True
-            stack.append(next_cell)
-        else:
-            stack.pop()
-
-
-generate_maze()
-
-
-# ---------------- GRID OBJECT INHERITANCE ----------------
-
-class GridObject(pygame.sprite.Sprite):
-    def __init__(self, grid_x, grid_y, image_path, offset=0):
-        super().__init__()
-        self.grid_x = grid_x
-        self.grid_y = grid_y
-        self.offset = offset
-        self.image = pygame.transform.scale(
-            pygame.image.load(image_path).convert_alpha(),
-            (CELL_SIZE - offset*2, CELL_SIZE - offset*2)
-        )
-        self.rect = self.image.get_rect()
-        self.update_rect()
-
-    def update_rect(self):
-        self.rect.topleft = (
-            self.grid_x * CELL_SIZE + self.offset,
-            self.grid_y * CELL_SIZE + self.offset
-        )
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-
-class User(GridObject):
-    def __init__(self, x, y):
-        super().__init__(x // CELL_SIZE, y // CELL_SIZE, "user.jpg", offset=4)
-
-    def move(self, x_change, y_change):
-        new_x = self.grid_x + x_change
-        new_y = self.grid_y + y_change
-        if 0 <= new_x < columns and 0 <= new_y < rows:
-            cell = maze[self.grid_x][self.grid_y]
-            if x_change == -1 and not cell.walls[3]:
-                self.grid_x = new_x
-            if x_change == 1 and not cell.walls[1]:
-                self.grid_x = new_x
-            if y_change == -1 and not cell.walls[0]:
-                self.grid_y = new_y
-            if y_change == 1 and not cell.walls[2]:
-                self.grid_y = new_y
-            self.update_rect()
-
-
-class Finish(GridObject):
-    def __init__(self, x, y):
-        super().__init__(x // CELL_SIZE, y // CELL_SIZE, "apple.jpg")
-
-
-# ---------------- DATA MANAGEMENT ----------------
-
-def text_file(name, time_value):
+def save_score(name, time_value):
     with open("leaderboard.txt", "a") as f:
         f.write(f"{name},{time_value:.3f}\n")
-
 
 def read_leaderboard():
     scores = []
     try:
         with open("leaderboard.txt", "r") as f:
             for line in f:
-                name, t = line.strip().split(",")
-                scores.append((name, float(t)))
+                n, t = line.strip().split(",")
+                scores.append((n, float(t)))
         scores.sort(key=lambda x: x[1])
     except:
         pass
     return scores
 
+# ---------------- UI ----------------
 
-# ---------------- PATHFINDING ----------------
+class Button:
+    def __init__(self, surf, x, y, text):
+        self.image = surf
+        self.rect = surf.get_rect(center=(x, y))
+        self.text = main_font.render(text, True, "white")
+        self.text_rect = self.text.get_rect(center=(x, y))
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+        screen.blit(self.text, self.text_rect)
+
+    def check(self, pos):
+        return self.rect.collidepoint(pos)
+
+class Slider:
+    def __init__(self, x, y, w, min_v, max_v, start):
+        self.rect = pygame.Rect(x, y, w, 6)
+        self.min = min_v
+        self.max = max_v
+        self.value = start
+        self.handle_x = x + (start - min_v) / (max_v - min_v) * w
+        self.drag = False
+
+    def handle_event(self, e):
+        if e.type == pygame.MOUSEBUTTONDOWN:
+            if abs(e.pos[0] - self.handle_x) < 12:
+                self.drag = True
+        elif e.type == pygame.MOUSEBUTTONUP:
+            self.drag = False
+        elif e.type == pygame.MOUSEMOTION and self.drag:
+            self.handle_x = max(self.rect.left, min(e.pos[0], self.rect.right))
+            self.value = int(self.min + (self.handle_x - self.rect.left) / self.rect.width * (self.max - self.min))
+
+    def draw(self):
+        pygame.draw.rect(screen, (180,180,180), self.rect)
+        pygame.draw.circle(screen, (50,50,50), (int(self.handle_x), self.rect.centery), 10)
+
+# ---------------- MAZE ----------------
+
+class Cell:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.visited = False
+        self.walls = [True, True, True, True]
+
+    def draw(self):
+        px, py = self.x*CELL_SIZE, self.y*CELL_SIZE
+        if self.walls[0]: pygame.draw.line(screen,(255,255,255),(px,py),(px+CELL_SIZE,py),2)
+        if self.walls[1]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py),(px+CELL_SIZE,py+CELL_SIZE),2)
+        if self.walls[2]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py+CELL_SIZE),(px,py+CELL_SIZE),2)
+        if self.walls[3]: pygame.draw.line(screen,(255,255,255),(px,py+CELL_SIZE),(px,py),2)
+
+maze = [[Cell(x,y) for y in range(rows)] for x in range(columns)]
+
+def generate_maze():
+    stack = []
+    c = maze[0][0]
+    c.visited = True
+    stack.append(c)
+    while stack:
+        c = stack[-1]
+        n = []
+        for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
+            nx, ny = c.x+dx, c.y+dy
+            if 0 <= nx < columns and 0 <= ny < rows and not maze[nx][ny].visited:
+                n.append((maze[nx][ny], w, ow))
+        if n:
+            nxt,w,ow = random.choice(n)
+            c.walls[w] = False
+            nxt.walls[ow] = False
+            nxt.visited = True
+            stack.append(nxt)
+        else:
+            stack.pop()
+
+generate_maze()
+def reset_game():
+    global maze, user, finish, racer, winner, start_time
+
+    for x in range(columns):
+        for y in range(rows):
+            maze[x][y].visited = False
+            maze[x][y].walls = [True, True, True, True]
+
+    generate_maze()
+
+    user = User()
+    finish = Finish()
+    racer = None
+    winner = None
+    start_time = 0
+# ---------------- PLAYER ----------------
+
+class User:
+    def __init__(self):
+        self.image = pygame.transform.scale(
+            pygame.image.load("user.jpg").convert_alpha(),
+            (CELL_SIZE-8, CELL_SIZE-8)
+        )
+        self.x = 0
+        self.y = 0
+        self.update()
+
+    def update(self):
+        self.rect = self.image.get_rect(topleft=(self.x*CELL_SIZE+4, self.y*CELL_SIZE+4))
+
+    def move(self, dx, dy):
+        cell = maze[self.x][self.y]
+        if dx == -1 and not cell.walls[3]: self.x -= 1
+        if dx == 1 and not cell.walls[1]: self.x += 1
+        if dy == -1 and not cell.walls[0]: self.y -= 1
+        if dy == 1 and not cell.walls[2]: self.y += 1
+        self.update()
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+class Finish:
+    def __init__(self):
+        self.image = pygame.transform.scale(
+            pygame.image.load("apple.jpg").convert_alpha(),
+            (CELL_SIZE, CELL_SIZE)
+        )
+        self.rect = self.image.get_rect(topleft=((columns-1)*CELL_SIZE,(rows-1)*CELL_SIZE))
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+user = User()
+finish = Finish()
+
+# ---------------- AI ----------------
 
 def get_neighbors(cell):
-    neighbors = []
-    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]
-    for dx, dy, wall, opp in directions:
-        nx = cell.x + dx
-        ny = cell.y + dy
+    out = []
+    for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
+        nx, ny = cell.x+dx, cell.y+dy
         if 0 <= nx < columns and 0 <= ny < rows:
-            if not cell.walls[wall] and not maze[nx][ny].walls[opp]:
-                neighbors.append(maze[nx][ny])
-    return neighbors
-
+            if not cell.walls[w]:
+                out.append(maze[nx][ny])
+    return out
 
 class AlgorithmRacer:
-    def __init__(self, algo, start_cell, goal_cell):
+    def __init__(self, algo):
         self.algo = algo
-        self.start = start_cell
-        self.goal = goal_cell
+        self.start = maze[0][0]
+        self.goal = maze[columns-1][rows-1]
         self.visited = set()
         self.prev = {}
         self.path = []
-        self.path_found = False
-        self.frame_counter = 0
-
+        self.frame = 0
+        
+        self.dead_ends = set()
         if algo == "Dijkstra":
             self.frontier = []
-            heapq.heappush(self.frontier, (0, start_cell))
-            self.dist = {start_cell: 0}
+            heapq.heappush(self.frontier, (0, 0,self.start))
+            self.dist = {self.start: 0}
+            self.counter = 0
         else:
-            self.frontier = [start_cell]
-
+            self.frontier = [self.start]
+    def reconstruct_path(self):
+        self.path = []
+        c = self.goal
+        while c in self.prev:
+            self.path.append(c)
+            c = self.prev[c]
+        self.path.append(self.start)
+        self.path.reverse()
+        
     def step(self):
-        if self.path_found or not self.frontier:
+        self.frame += 1
+        if self.frame < delay or not self.frontier:
             return
+        self.frame = 0
 
-        delay = DFS_DELAY if self.algo == "DFS" else BFS_DELAY if self.algo == "BFS" else DIJKSTRA_DELAY
-        self.frame_counter += 1
-        if self.frame_counter < delay:
-            return
-        self.frame_counter = 0
-
-        current = (
-            self.frontier.pop() if self.algo == "DFS"
-            else self.frontier.pop(0) if self.algo == "BFS"
-            else heapq.heappop(self.frontier)[1]
-        )
+        if self.algo == "DFS":
+            current = self.frontier.pop()
+        elif self.algo == "BFS":
+            current = self.frontier.pop(0)
+        else:
+            _, _, current = heapq.heappop(self.frontier)
 
         if current in self.visited:
             return
@@ -277,194 +245,218 @@ class AlgorithmRacer:
 
         if current == self.goal:
             self.reconstruct_path()
-            self.path_found = True
             return
 
-        for neighbor in get_neighbors(current):
-            if neighbor not in self.visited:
-                if self.algo in ["DFS", "BFS"] and neighbor not in self.frontier:
-                    self.frontier.append(neighbor)
-                    self.prev[neighbor] = current
-                elif self.algo == "Dijkstra":
-                    new_dist = self.dist[current] + 1
-                    if neighbor not in self.dist or new_dist < self.dist[neighbor]:
-                        self.dist[neighbor] = new_dist
-                        heapq.heappush(self.frontier, (new_dist, neighbor))
-                        self.prev[neighbor] = current
+        expanded = False
 
-    def reconstruct_path(self):
-        cell = self.goal
-        while cell in self.prev:
-            self.path.append(cell)
-            cell = self.prev[cell]
-        self.path.append(self.start)
-        self.path.reverse()
+        for n in get_neighbors(current):
+            if self.algo == "Dijkstra":
+                new_d = self.dist[current] + 1
+                if n not in self.dist or new_d < self.dist[n]:
+                    self.dist[n] = new_d
+                    self.counter += 1
+                    heapq.heappush(self.frontier, (new_d, self.counter, n))
+                    self.prev[n] = current
+                    expanded = True
+            else:
+                if n not in self.visited and n not in self.frontier:
+                    self.frontier.append(n)
+                    self.prev[n] = current
+                    expanded = True
 
+        if not expanded and current != self.goal:
+            self.dead_ends.add(current)
+    
     def draw(self):
-        for cell in self.visited:
-            pygame.draw.rect(screen, (0,0,255),
-                (cell.x*CELL_SIZE+10, cell.y*CELL_SIZE+10, CELL_SIZE-20, CELL_SIZE-20))
-        for cell in self.path:
-            pygame.draw.rect(screen, (255,255,0),
-                (cell.x*CELL_SIZE+20, cell.y*CELL_SIZE+20, CELL_SIZE-40, CELL_SIZE-40))
+    # explored cells
+        for c in self.visited:
+            if c in self.dead_ends:
+                color = (130, 130, 130)
+            else:
+                color = (0, 200, 255)
+                
+            pygame.draw.rect(screen,color,(c.x * CELL_SIZE + 20,c.y * CELL_SIZE + 20,CELL_SIZE - 40,CELL_SIZE - 40))
 
+        # final path dots + direction lines
+        for i in range(len(self.path) - 1):
+            c1 = self.path[i]
+            c2 = self.path[i + 1]
 
-# ---------------- UI OBJECTS ----------------
+            # centre of current cell
+            x1 = c1.x * CELL_SIZE + CELL_SIZE // 2
+            y1 = c1.y * CELL_SIZE + CELL_SIZE // 2
 
-start_button = Button(pygame.transform.scale(pygame.image.load("start.png").convert_alpha(), (400,150)),
-                      SCREEN_WIDTH//2, SCREEN_HEIGHT//2, "")
-play_again_button = Button(pygame.transform.scale(pygame.image.load("replay.png").convert_alpha(), (250,80)),
-                           SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 40, "")
-leaderboard_button = Button(pygame.transform.scale(pygame.image.load("scores.png").convert_alpha(), (250,80)),
-                            SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 140, "")
-back_button = Button(pygame.transform.scale(pygame.image.load("menu.png").convert_alpha(), (200,70)),
-                     SCREEN_WIDTH//2, SCREEN_HEIGHT - 60, "")
+            # centre of next cell
+            x2 = c2.x * CELL_SIZE + CELL_SIZE // 2
+            y2 = c2.y * CELL_SIZE + CELL_SIZE // 2
 
-user = User(0, 0)
-finish = Finish((columns-1)*CELL_SIZE, (rows-1)*CELL_SIZE)
-name_box = TextBox(SCREEN_WIDTH//2-100, SCREEN_HEIGHT//2+60, 200, 50, pygame.font.SysFont("Arial",40))
+            # draw dot
+            pygame.draw.circle(screen, (255, 0, 0), (x1, y1), 6)
 
+            # draw direction line
+            pygame.draw.line(screen, (255, 0, 0), (x1, y1), (x2, y2), 3)
 
-# ---------------- GAME STATES ----------------
+        # draw dot on goal
+        if self.path:
+            last = self.path[-1]
+            pygame.draw.circle(screen,(255, 0, 0),(last.x * CELL_SIZE + CELL_SIZE // 2,last.y * CELL_SIZE + CELL_SIZE // 2),6)
+        return len(self.path)            
+# ---------------- BUTTONS ----------------
 
-while state == "start":
-    screen.fill((0,0,255))
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if start_button.checkinput(pygame.mouse.get_pos()):
-                state = "algorithm_select"
-    start_button.update()
-    pygame.display.flip()
-    clock.tick(60)
+btn = pygame.Surface((300,70))
+btn.fill((60,60,60))
 
+start_button = Button(btn,400,300,"START")
+difficulty_button = Button(btn,400,400,"SELECT AI")
 
-dfs_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2-100, "DFS")
-bfs_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2, "BFS")
-dijkstra_button = Button(pygame.Surface((250,80)), SCREEN_WIDTH//2, SCREEN_HEIGHT//2+100, "Dijkstra")
+bfs_button = Button(btn,400,250,"BFS (Easy)")
+dfs_button = Button(btn,400,410,"DFS (Hard)")
+dijkstra_button = Button(btn,400,330,"DIJKSTRA (Medium)")
 
-while state == "algorithm_select":
-    screen.fill((0,100,0))
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
-            if dfs_button.checkinput(pos):
-                current_algorithm = "DFS"
-                state = "race"
-            elif bfs_button.checkinput(pos):
-                current_algorithm = "BFS"
-                state = "race"
-            elif dijkstra_button.checkinput(pos):
-                current_algorithm = "Dijkstra"
-                state = "race"
-    dfs_button.update()
-    bfs_button.update()
-    dijkstra_button.update()
-    pygame.display.flip()
-    clock.tick(60)
+back_button = Button(btn,400,650,"BACK")
+leaderboard_button = Button(btn,400,560,"LEADERBOARD")
+view_route_button = Button(btn, 400, 460, "VIEW AI ROUTE")
 
+slider = Slider(250,500,300,1,60,30)
 
-racer = AlgorithmRacer(current_algorithm, maze[0][0], maze[columns-1][rows-1])
-start_time = 0
+racer = None
 
+# ---------------- MAIN LOOP ----------------
 
 while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+    for e in pygame.event.get():
+        if e.type == pygame.QUIT:
             running = False
 
-        if state == "race" and event.type == pygame.KEYDOWN:
-            if start_time == 0:
+        if state == "start" and e.type == pygame.MOUSEBUTTONDOWN:
+            if difficulty_button.check(e.pos):
+                state = "difficulty"
+            elif start_button.check(e.pos) and difficulty_selected and algorithm_selected:
+                racer = AlgorithmRacer(current_algorithm)
                 start_time = time.time()
-            if event.key == pygame.K_LEFT:
-                user.move(-1,0)
-            elif event.key == pygame.K_RIGHT:
-                user.move(1,0)
-            elif event.key == pygame.K_UP:
-                user.move(0,-1)
-            elif event.key == pygame.K_DOWN:
-                user.move(0,1)
+                just_started = True
+                state = "race"
 
-        if state == "menu":
-            result = name_box.handle_event(event)
-            if result is not None and not name_submitted:
-                player_name = result if result.strip() else "Anonymous"
-                text_file(player_name, total_time)
+        if state == "difficulty":
+            slider.handle_event(e)
+            if e.type == pygame.MOUSEBUTTONDOWN:
+                if bfs_button.check(e.pos):
+                    current_algorithm = "BFS"
+                    algorithm_selected = True
+                elif dfs_button.check(e.pos):
+                    current_algorithm = "DFS"
+                    algorithm_selected = True
+                elif dijkstra_button.check(e.pos):
+                    current_algorithm = "Dijkstra"
+                    algorithm_selected = True
+                elif back_button.check(e.pos):
+                    delay = max(1, 60 - slider.value)
+                    difficulty_selected = True
+                    state = "start"
+
+        if state == "race" and e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_LEFT: user.move(-1,0)
+            if e.key == pygame.K_RIGHT: user.move(1,0)
+            if e.key == pygame.K_UP: user.move(0,-1)
+            if e.key == pygame.K_DOWN: user.move(0,1)
+
+        if state == "menu" and e.type == pygame.KEYDOWN and not name_submitted:
+            if e.key == pygame.K_RETURN and not name_submitted:
+                save_score(player_name if player_name else "Anonymous", total_time)
                 name_submitted = True
+                
+            elif e.key == pygame.K_BACKSPACE:
+                player_name = player_name[:-1]
+            else:
+                if len(player_name) < 12:
+                    player_name += e.unicode
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-                if play_again_button.checkinput(pos):
-                    maze = [[MazeCell(x, y, CELL_SIZE) for y in range(rows)] for x in range(columns)]
-                    generate_maze()
-                    user = User(0, 0)
-                    finish = Finish((columns-1)*CELL_SIZE, (rows-1)*CELL_SIZE)
-                    racer = AlgorithmRacer(current_algorithm, maze[0][0], maze[columns-1][rows-1])
-                    start_time = 0
-                    name_submitted = False
-                    winner = None
-                    state = "race"
-                elif leaderboard_button.checkinput(pos):
-                    state = "leaderboard"
+        if state == "menu" and e.type == pygame.MOUSEBUTTONDOWN:
+            if leaderboard_button.check(e.pos):
+                state = "leaderboard"
+                name_submitted = False
+                player_name = ""
+            elif back_button.check(e.pos):
+                reset_game()
+                state = "start"
+                name_submitted = False
+                player_name = ""
+                winner = None
+            elif view_route_button.check(e.pos):
+                state = "route_view"
 
-        if state == "leaderboard" and event.type == pygame.MOUSEBUTTONDOWN:
-            if back_button.checkinput(pygame.mouse.get_pos()):
+        if state == "leaderboard" and e.type == pygame.MOUSEBUTTONDOWN:
+            if back_button.check(e.pos):
                 state = "menu"
+        if state == "route_view" and e.type == pygame.MOUSEBUTTONDOWN:
+            if back_button.check(e.pos):
+                state = "menu"
+    screen.fill((0,0,0))
 
-    if state == "race":
-        screen.fill((0,0,0))
-        for x in range(columns):
-            for y in range(rows):
-                maze[x][y].draw(screen)
+    if state == "start":
+        start_button.draw()
+        difficulty_button.draw()
+
+    elif state == "difficulty":
+        screen.blit(font_small.render(f"Current Algorithm: {current_algorithm}",True,(255,255,255)),(130,160))
+        bfs_button.draw()
+        dfs_button.draw()
+        dijkstra_button.draw()
+        slider.draw()
+        back_button.draw()
+        screen.blit(font_small.render(f"Speed: {slider.value}",True,(255,255,255)),(330,560))
+
+    elif state == "race":
+        for col in maze:
+            for c in col:
+                c.draw()
+        racer.step()
+        racer.draw()
         finish.draw()
         user.draw()
-        if winner is None:
-            racer.step()
-        racer.draw()
+        just_started = False
 
-        if user.rect.colliderect(finish.rect) and winner is None:
+        if user.rect.colliderect(finish.rect) and winner is None and not just_started:
+            total_time = time.time() - start_time
             winner = "You"
-            total_time = time.time() - start_time
             state = "menu"
-        elif racer.path_found and winner is None:
-            winner = current_algorithm
+        elif racer.goal in racer.visited:
             total_time = time.time() - start_time
+            winner = current_algorithm
             state = "menu"
 
     elif state == "menu":
-        screen.fill((0,200,0))
-        font_big = pygame.font.SysFont("Impact", 60)
-        font_small = pygame.font.SysFont("Arial", 40)
-        if winner:
-            screen.blit(font_big.render(f"{winner} Won!", True, (255,255,255)),
-                        (SCREEN_WIDTH//2-150, SCREEN_HEIGHT//2-200))
-            screen.blit(font_small.render(f"Time: {total_time:.3f}", True, (255,255,255)),
-                        (SCREEN_WIDTH//2-100, SCREEN_HEIGHT//2-140))
-        name_box.draw()
-        play_again_button.update()
-        leaderboard_button.update()
+        screen.blit(font_big.render(f"{winner} Won!",True,(255,255,255)),(250,200))
+        screen.blit(font_small.render(f"Time: {total_time:.2f}s",True,(255,255,255)),(300,260))
+        if winner == "You":
+            screen.blit(font_small.render("Enter Name:",True,(255,255,255)),(300,330))
+            pygame.draw.rect(screen,(255,255,255),(300,370,200,40),2)
+        screen.blit(font_small.render(player_name,True,(255,255,255)),(310,375))
+        view_route_button.draw()
+        leaderboard_button.draw()
+        back_button.draw()
+    elif state == "route_view":
+        screen.fill((0,0,0))
+
+        for col in maze:
+            for c in col:
+                c.draw()
+
+        racer.draw()
+        finish.draw()
+
+        screen.blit(font_big.render("AI Route", True, (255,255,255)),(300, 40))
+        screen.blit(font_big.render(f"Moves: {len(racer.path)}", True, (255,255,255)),(300, 140))
+
+        back_button.draw()
 
     elif state == "leaderboard":
-        screen.fill((0,0,0))
-        font_title = pygame.font.SysFont("Impact",60)
-        font_entry = pygame.font.SysFont("Arial",30)
-        screen.blit(font_title.render("Leaderboard", True, (255,215,0)),
-                    (SCREEN_WIDTH//2-150,50))
-        y = 120
-        scores = read_leaderboard()
-        if not scores:
-            screen.blit(font_entry.render("No scores yet!", True, (255,255,255)), (100, y))
-        else:
-            for i, score in enumerate(scores[:15],1):
-                screen.blit(font_entry.render(f"{i}. {score[0]} - {score[1]:.3f} s",
-                           True, (255,255,255)), (50, y))
-                y += 35
-        back_button.update()
+        screen.blit(font_big.render("Leaderboard",True,(255,215,0)),(240,80))
+        y = 170
+        for i,(n,t) in enumerate(read_leaderboard()[:10],1):
+            screen.blit(font_small.render(f"{i}. {n} - {t:.2f}s",True,(255,255,255)),(200,y))
+            y += 35
+        back_button.draw()
 
     pygame.display.flip()
     clock.tick(60)
