@@ -4,220 +4,6 @@ import sys
 import time
 import heapq
 
-pygame.init()
-
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 800
-maze_size = 10
-CELL_SIZE = SCREEN_WIDTH // maze_size
-columns = SCREEN_WIDTH // CELL_SIZE
-rows = SCREEN_HEIGHT // CELL_SIZE
-
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Algorithm Racer")
-clock = pygame.time.Clock()
-
-main_font = pygame.font.SysFont("OCR A EXTENDED", 50)
-font_small = pygame.font.SysFont("OCR A EXTENDED", 32)
-font_big = pygame.font.SysFont("OCR A EXTENDED", 60)
-
-running = True
-state = "start"
-
-current_algorithm = None
-algorithm_selected = False
-difficulty_selected = False
-delay = 30
-ai_started = False
-score_saved = False
-winner = None
-start_time = 0
-total_time = 0
-just_started = False
-player_name = ""
-name_active = False
-name_submitted = False
-
-# ---------------- LEADERBOARD ----------------
-def leaderboard_file():
-    return f"leaderboard_{maze_size}x{maze_size}.txt"
-
-def save_score(name, time_value):
-    with open(leaderboard_file(), "a") as f:
-        f.write(f"{name},{time_value:.3f}\n")
-
-def read_leaderboard():
-    scores = []
-    try:
-        with open(leaderboard_file(), "r") as f:
-            for line in f:
-                n, t = line.strip().split(",")
-                scores.append((n, float(t)))
-        scores.sort(key=lambda x: x[1])
-    except:
-        pass
-    return scores
-
-# ---------------- UI ----------------
-
-class Button:
-    def __init__(self, surf, x, y, text):
-        self.image = surf
-        self.rect = surf.get_rect(center=(x, y))
-        self.text = main_font.render(text, True, "white")
-        self.text_rect = self.text.get_rect(center=(x, y))
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-        screen.blit(self.text, self.text_rect)
-
-    def check(self, pos):
-        return self.rect.collidepoint(pos)
-
-class Slider:
-    def __init__(self, x, y, w, min_v, max_v, start):
-        self.rect = pygame.Rect(x, y, w, 6)
-        self.min = min_v
-        self.max = max_v
-        self.value = start
-        self.handle_x = x + (start - min_v) / (max_v - min_v) * w
-        self.drag = False
-
-    def handle_event(self, e):
-        if e.type == pygame.MOUSEBUTTONDOWN:
-            if abs(e.pos[0] - self.handle_x) < 12:
-                self.drag = True
-        elif e.type == pygame.MOUSEBUTTONUP:
-            self.drag = False
-        elif e.type == pygame.MOUSEMOTION and self.drag:
-            self.handle_x = max(self.rect.left, min(e.pos[0], self.rect.right))
-            self.value = int(self.min + (self.handle_x - self.rect.left) / self.rect.width * (self.max - self.min))
-
-    def draw(self):
-        pygame.draw.rect(screen, (180,180,180), self.rect)
-        pygame.draw.circle(screen, (50,50,50), (int(self.handle_x), self.rect.centery), 10)
-
-# ---------------- MAZE ----------------
-
-class Cell:
-    def __init__(self, x, y):
-        self.x, self.y = x, y
-        self.visited = False
-        self.walls = [True, True, True, True]
-
-    def draw(self):
-        px, py = self.x*CELL_SIZE, self.y*CELL_SIZE
-        if self.walls[0]: pygame.draw.line(screen,(255,255,255),(px,py),(px+CELL_SIZE,py),2)
-        if self.walls[1]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py),(px+CELL_SIZE,py+CELL_SIZE),2)
-        if self.walls[2]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py+CELL_SIZE),(px,py+CELL_SIZE),2)
-        if self.walls[3]: pygame.draw.line(screen,(255,255,255),(px,py+CELL_SIZE),(px,py),2)
-
-maze = [[Cell(x,y) for y in range(rows)] for x in range(columns)]
-
-def generate_maze():
-    stack = []
-    c = maze[0][0]
-    c.visited = True
-    stack.append(c)
-    while stack:
-        c = stack[-1]
-        n = []
-        for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
-            nx, ny = c.x+dx, c.y+dy
-            if 0 <= nx < columns and 0 <= ny < rows and not maze[nx][ny].visited:
-                n.append((maze[nx][ny], w, ow))
-        if n:
-            nxt,w,ow = random.choice(n)
-            c.walls[w] = False
-            nxt.walls[ow] = False
-            nxt.visited = True
-            stack.append(nxt)
-        else:
-            stack.pop()
-
-generate_maze()
-def rebuild_maze(size):
-    global maze_size, CELL_SIZE, columns, rows, maze, user, finish, racer
-
-    maze_size = size
-    CELL_SIZE = SCREEN_WIDTH // maze_size
-    columns = rows = maze_size
-
-    maze = [[Cell(x, y) for y in range(rows)] for x in range(columns)]
-    generate_maze()
-
-    user = User()
-    finish = Finish()
-    
-    racer = None
-def reset_game():
-    global maze, user, finish, racer, winner, start_time, ai_started, score_saved
-
-    for x in range(columns):
-        for y in range(rows):
-            maze[x][y].visited = False
-            maze[x][y].walls = [True, True, True, True]
-
-    generate_maze()
-
-    user = User()
-    finish = Finish()
-    ai_started = False
-    racer = None
-    winner = None
-    start_time = 0
-    score_saved = False
-# ---------------- PLAYER ----------------
-
-class User:
-    def __init__(self):
-        self.image = pygame.transform.scale(
-            pygame.image.load("user.jpg").convert_alpha(),
-            (CELL_SIZE-8, CELL_SIZE-8)
-        )
-        self.x = 0
-        self.y = 0
-        self.update()
-
-    def update(self):
-        self.rect = self.image.get_rect(topleft=(self.x*CELL_SIZE+4, self.y*CELL_SIZE+4))
-
-    def move(self, dx, dy):
-        cell = maze[self.x][self.y]
-        if dx == -1 and not cell.walls[3]: self.x -= 1
-        if dx == 1 and not cell.walls[1]: self.x += 1
-        if dy == -1 and not cell.walls[0]: self.y -= 1
-        if dy == 1 and not cell.walls[2]: self.y += 1
-        self.update()
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-class Finish:
-    def __init__(self):
-        self.image = pygame.transform.scale(
-            pygame.image.load("apple.jpg").convert_alpha(),
-            (CELL_SIZE, CELL_SIZE)
-        )
-        self.rect = self.image.get_rect(topleft=((columns-1)*CELL_SIZE,(rows-1)*CELL_SIZE))
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-user = User()
-finish = Finish()
-
-# ---------------- AI ----------------
-
-def get_neighbors(cell):
-    out = []
-    for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
-        nx, ny = cell.x+dx, cell.y+dy
-        if 0 <= nx < columns and 0 <= ny < rows:
-            if not cell.walls[w]:
-                out.append(maze[nx][ny])
-    return out
-
 class AlgorithmRacer:
     def __init__(self, algo):
         self.algo = algo
@@ -299,9 +85,9 @@ class AlgorithmRacer:
             if c in self.dead_ends:
                 colour = (130, 130, 130)
             else:
-                colour = (0, 0, 70)
+                colour = (0, 0, 150)
                 
-            pygame.draw.rect(screen,colour,(c.x * CELL_SIZE + 20,c.y * CELL_SIZE + 20,CELL_SIZE - 40,CELL_SIZE - 40))
+            pygame.draw.rect(screen,colour,(c.x * CELL_SIZE + 10,c.y * CELL_SIZE + 10,CELL_SIZE - 20,CELL_SIZE - 20))
 
         # final path dots + direction lines
         for i in range(len(self.path) - 1):
@@ -317,7 +103,7 @@ class AlgorithmRacer:
             y2 = c2.y * CELL_SIZE + CELL_SIZE // 2
 
             # draw dot
-            pygame.draw.circle(screen, (255, 0, 0), (x1, y1), 6)
+            pygame.draw.circle(screen, (255, 0, 0), (x1, y1), 5)
 
             # draw direction line
             pygame.draw.line(screen, (255, 0, 0), (x1, y1), (x2, y2), 3)
@@ -325,10 +111,217 @@ class AlgorithmRacer:
         # draw dot on goal
         if self.path:
             last = self.path[-1]
-            pygame.draw.circle(screen,(0, 0, 255),(last.x * CELL_SIZE + CELL_SIZE // 2,last.y * CELL_SIZE + CELL_SIZE // 2),18)
+            pygame.draw.circle(screen,(0, 0, 255),(last.x * CELL_SIZE + CELL_SIZE // 2,last.y * CELL_SIZE + CELL_SIZE // 2),10)
         return len(self.path)
-# ---------------- BUTTONS ----------------
+class Button:
+    def __init__(self, surf, x, y, text):
+        self.image = surf
+        self.rect = surf.get_rect(center=(x, y))
+        self.text = main_font.render(text, True, "white")
+        self.text_rect = self.text.get_rect(center=(x, y))
 
+    def draw(self):
+        screen.blit(self.image, self.rect)
+        screen.blit(self.text, self.text_rect)
+
+    def check(self, pos):
+        return self.rect.collidepoint(pos) # recognises collisions with mouse
+
+class Slider:
+    def __init__(self, x, y, w, min_v, max_v, start):
+        self.rect = pygame.Rect(x, y, w, 6)
+        self.min = min_v
+        self.max = max_v
+        self.value = start
+        self.handle_x = x + (start - min_v) / (max_v - min_v) * w
+        self.drag = False
+
+    def handle_event(self, e):
+        if e.type == pygame.MOUSEBUTTONDOWN:
+            if abs(e.pos[0] - self.handle_x) < 12:
+                self.drag = True
+        elif e.type == pygame.MOUSEBUTTONUP:
+            self.drag = False
+        elif e.type == pygame.MOUSEMOTION and self.drag:
+            self.handle_x = max(self.rect.left, min(e.pos[0], self.rect.right))
+            self.value = int(self.min + (self.handle_x - self.rect.left) / self.rect.width * (self.max - self.min)) # calculation to work out position of slider
+
+    def draw(self):
+        pygame.draw.rect(screen, (180,180,180), self.rect)
+        pygame.draw.circle(screen, (50,50,50), (int(self.handle_x), self.rect.centery), 10)
+
+# ---------------- MAZE CREATION----------------
+
+class Cell:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.visited = False
+        self.walls = [True, True, True, True]
+
+    def draw(self):
+        px, py = self.x*CELL_SIZE, self.y*CELL_SIZE
+        if self.walls[0]: pygame.draw.line(screen,(255,255,255),(px,py),(px+CELL_SIZE,py),2)
+        if self.walls[1]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py),(px+CELL_SIZE,py+CELL_SIZE),2)
+        if self.walls[2]: pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py+CELL_SIZE),(px,py+CELL_SIZE),2)
+        if self.walls[3]: pygame.draw.line(screen,(255,255,255),(px,py+CELL_SIZE),(px,py),2)
+
+class User:
+    def __init__(self):
+        self.image = pygame.transform.scale(pygame.image.load("images/user.jpg").convert_alpha(),(CELL_SIZE-8, CELL_SIZE-8))
+        self.x = 0
+        self.y = 0
+        self.update()
+
+    def update(self):
+        self.rect = self.image.get_rect(topleft=(self.x*CELL_SIZE+4, self.y*CELL_SIZE+4))
+
+    def move(self, dx, dy):
+        cell = maze[self.x][self.y]
+        if dx == -1 and not cell.walls[3]: self.x -= 1
+        if dx == 1 and not cell.walls[1]: self.x += 1
+        if dy == -1 and not cell.walls[0]: self.y -= 1
+        if dy == 1 and not cell.walls[2]: self.y += 1
+        self.update()
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+class Finish:
+    def __init__(self):
+        self.image = pygame.transform.scale(pygame.image.load("images/apple.jpg").convert_alpha(),(CELL_SIZE, CELL_SIZE))
+        self.rect = self.image.get_rect(topleft=((columns-1)*CELL_SIZE,(rows-1)*CELL_SIZE))
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+# ---------------- LEADERBOARDS ----------------
+def leaderboard_file():
+    return f"leaderboard_{maze_size}x{maze_size}.txt"
+
+def save_score(name, time_value):
+    with open(leaderboard_file(), "a") as f:
+        f.write(f"{name},{time_value:.3f}\n")
+
+def read_leaderboard():
+    scores = []
+    try:
+        with open(leaderboard_file(), "r") as f:
+            for line in f:
+                n, t = line.strip().split(",")
+                scores.append((n, float(t)))
+        scores.sort(key=lambda x: x[1]) # sorts by time
+    except:
+        pass
+    return scores
+
+# ---------------- UI ----------------
+
+
+def generate_maze():
+    stack = []
+    c = maze[0][0]
+    c.visited = True
+    stack.append(c)
+    while stack:
+        c = stack[-1]
+        n = []
+        for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
+            nx, ny = c.x+dx, c.y+dy
+            if 0 <= nx < columns and 0 <= ny < rows and not maze[nx][ny].visited:
+                n.append((maze[nx][ny], w, ow))
+        if n:
+            nxt,w,ow = random.choice(n)
+            c.walls[w] = False
+            nxt.walls[ow] = False
+            nxt.visited = True
+            stack.append(nxt)
+        else:
+            stack.pop()
+
+
+def rebuild_maze(size):
+    global maze_size, CELL_SIZE, columns, rows, maze, user, finish, racer
+
+    maze_size = size
+    CELL_SIZE = SCREEN_WIDTH // maze_size
+    columns = rows = maze_size
+
+    maze = [[Cell(x, y) for y in range(rows)] for x in range(columns)]
+    generate_maze()
+
+    user = User()
+    finish = Finish()
+    
+    racer = None
+def reset_game():
+    global maze, user, finish, racer, winner, start_time, ai_started, score_saved
+
+    for x in range(columns):
+        for y in range(rows):
+            maze[x][y].visited = False
+            maze[x][y].walls = [True, True, True, True]
+
+    generate_maze()
+
+    user = User()
+    finish = Finish()
+    ai_started = False
+    racer = None
+    winner = None
+    start_time = 0
+    score_saved = False
+
+
+
+
+
+def get_neighbors(cell):
+    out = []
+    for dx,dy,w,ow in [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]:
+        nx, ny = cell.x+dx, cell.y+dy
+        if 0 <= nx < columns and 0 <= ny < rows:
+            if not cell.walls[w]:
+                out.append(maze[nx][ny])
+    return out
+
+
+pygame.init()
+
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 800
+maze_size = 10
+CELL_SIZE = SCREEN_WIDTH // maze_size
+columns = SCREEN_WIDTH // CELL_SIZE
+rows = SCREEN_HEIGHT // CELL_SIZE
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Algorithm Racer")
+clock = pygame.time.Clock()
+
+main_font = pygame.font.SysFont("OCR A EXTENDED", 50)
+font_small = pygame.font.SysFont("OCR A EXTENDED", 32)
+font_big = pygame.font.SysFont("OCR A EXTENDED", 60)
+
+running = True
+state = "start"
+
+current_algorithm = None
+algorithm_selected = False
+difficulty_selected = False
+delay = 30
+ai_started = False
+score_saved = False
+winner = None
+start_time = 0
+total_time = 0
+just_started = False
+player_name = ""
+name_active = False
+name_submitted = False
+
+maze = [[Cell(x,y) for y in range(rows)] for x in range(columns)]
+user = User()
+finish = Finish()
+generate_maze()
 btn = pygame.Surface((300,70))
 btn.fill((60,60,60))
 c = pygame.Surface((180,70))
