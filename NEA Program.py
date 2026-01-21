@@ -123,12 +123,12 @@ class AlgorithmRacer:
             self.dead_ends.add(current)
 
     def draw(self):
-        # Draw explored cells
+        # Draw explored cells (AI territory)
         for cell in self.visited:
             if cell in self.dead_ends:
-                colour = (130, 130, 130)
+                colour = (90, 90, 90)  # Cold grey for dead ends (AI abandoned paths)
             else:
-                colour = (0, 0, 150)
+                colour = (90, 30, 120)
 
             pygame.draw.rect(screen,colour,(cell.x * CELL_SIZE + 10,cell.y * CELL_SIZE + 10,CELL_SIZE - 20,CELL_SIZE - 20))
 
@@ -142,13 +142,13 @@ class AlgorithmRacer:
             x2 = c2.x * CELL_SIZE + CELL_SIZE // 2
             y2 = c2.y * CELL_SIZE + CELL_SIZE // 2
 
-            pygame.draw.circle(screen, (255, 0, 0), (x1, y1), 5)
-            pygame.draw.line(screen, (255, 0, 0), (x1, y1), (x2, y2), 3)
+            pygame.draw.circle(screen, (200, 40, 40), (x1, y1), 7)
+            pygame.draw.line(screen, (170, 30, 30), (x1, y1), (x2, y2), 5)
 
         # Draw final position dot
         if self.path:
             last = self.path[-1]
-            pygame.draw.circle(screen,(0, 0, 255),(last.x * CELL_SIZE + CELL_SIZE // 2,last.y * CELL_SIZE + CELL_SIZE // 2),10)
+            pygame.draw.circle(screen,(220, 30, 30),(last.x * CELL_SIZE + CELL_SIZE // 2,last.y * CELL_SIZE + CELL_SIZE // 2),10)
 
         return len(self.path)
 class Button:
@@ -219,17 +219,21 @@ class ImageObject(GridObject):
         super().__init__(x, y)
         # Load and scale the image
         self.image = pygame.transform.scale(pygame.image.load(image_path).convert_alpha(),(CELL_SIZE - size_offset, CELL_SIZE - size_offset))
-        self.rect = self.image.get_rect(topleft=(self.x*CELL_SIZE, self.y*CELL_SIZE))
+        self.update_rect()
 
     def update_rect(self):
-        self.rect.topleft = (self.x*CELL_SIZE, self.y*CELL_SIZE)
+        center_x = self.x * CELL_SIZE + CELL_SIZE // 2
+        center_y = self.y * CELL_SIZE + CELL_SIZE // 2
+
+        # Place the image so its centre aligns with the cell centre
+        self.rect = self.image.get_rect(center=(center_x, center_y))
 
     def draw(self):
         screen.blit(self.image, self.rect)
 class User(ImageObject):
     def __init__(self):
-        super().__init__(0,0,"images/user.jpg", size_offset = 8)
-        self.image = pygame.transform.scale(pygame.image.load("images/user.jpg").convert_alpha(),(CELL_SIZE-8, CELL_SIZE-8))
+        super().__init__(0,0,"images/user.png", size_offset = 8)
+        
 
 
     def move(self, dx, dy):
@@ -247,25 +251,39 @@ class User(ImageObject):
 
 class Finish(ImageObject):
     def __init__(self):
-        super().__init__(columns-1, rows-1, "images/apple.jpg")
+        super().__init__(columns-1, rows-1, "images/finish.png", size_offset = 20)
+        
 # ---------------- LEADERBOARDS ----------------
 def leaderboard_file():
+    # Return the filename based on the current maze size
     return f"leaderboard_{maze_size}x{maze_size}.txt"
 
+
 def save_score(name, time_value):
-    with open(leaderboard_file(), "a") as f:
-        f.write(f"{name},{time_value:.3f}\n")
+    # Open the file in append mode to add a new score
+    file = open(leaderboard_file(), "a")
+    file.write(f"{name},{time_value:.3f}\n")  # Save name and time with 3 decimals
+    file.close()
+
 
 def read_leaderboard():
     scores = []
+
     try:
-        with open(leaderboard_file(), "r") as f:
-            for line in f:
-                n, t = line.strip().split(",")
-                scores.append((n, float(t)))
-        scores.sort(key=lambda x: x[1]) # sorts by time
+        # Open the leaderboard file in read mode
+        file = open(leaderboard_file(), "r")
+        for line in file:
+            line = line.strip()              # Remove newline characters
+            n, t = line.split(",")           # Split name and time
+            scores.append((n, float(t)))     # Add tuple (name, time) to list
+        file.close()
+
+        # Sort the scores by time in ascending order
+        scores.sort(key=lambda entry: entry[1])
     except:
+        # If the file doesn't exist or can't be read, do nothing
         pass
+
     return scores
 
 # ---------------- UI ----------------
@@ -287,8 +305,9 @@ def generate_maze():
                 neighbour = maze[newx][newy]
                 unvisited.append((neighbour, wall, opposite_wall))
         if unvisited:
-            next_cell,wall,opposite_wall = random.choice(unvisited)
+            next_cell,wall,opposite_wall = random.choice(unvisited) # randomises cell to travel to and sets appropriate values
             current.walls[wall] = False
+            # Removes neighouring wall
             next_cell.walls[opposite_wall] = False
             next_cell.visited = True
             stack.append(next_cell)
@@ -303,25 +322,43 @@ def rebuild_maze(size):
     CELL_SIZE = SCREEN_WIDTH // maze_size
     columns = rows = maze_size
 
-    maze = [[Cell(x, y) for y in range(rows)] for x in range(columns)]
+    maze = []
+    # Creation of maze
+    for x in range(columns):
+        column = []
+        for y in range(rows):
+            cell = Cell(x, y)
+            column.append(cell)
+        maze.append(column)
     generate_maze()
 
     user = User()
     finish = Finish()
     
     racer = None
-def reset_game():
-    global maze, user, finish, racer, winner, start_time, ai_started, score_saved, random_controls, control_map
 
+def reset_game():
+    """
+    Resets the game without changing the maze size.
+    """
+
+    global maze, user, finish, racer, winner, start_time
+    global ai_started, score_saved, random_controls, control_map
+
+    # Reset every cell in the maze
     for x in range(columns):
         for y in range(rows):
-            maze[x][y].visited = False
-            maze[x][y].walls = [True, True, True, True]
+            maze[x][y].visited = False      # Cell has not been visited
+            maze[x][y].walls = [True, True, True, True]  # All walls restored
 
+    # Regenerate maze paths
     generate_maze()
 
+    # Recreate player and finish
     user = User()
     finish = Finish()
+
+    # Reset game state variables
     ai_started = False
     racer = None
     winner = None
@@ -336,18 +373,18 @@ def reset_game():
 
 def get_neighbors(cell):
     neighbours = []
-    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)]
-    for change_x,change_y,wall,opposite_wall in directions:
+    directions = [(-1,0,3,1),(1,0,1,3),(0,-1,0,2),(0,1,2,0)] # Left, Right, Up, Down
+    for change_x,change_y,wall,opposite_wall in directions: 
         newx = cell.x+change_x
         newy = cell.y+change_y
-        if 0 <= newx < columns and 0 <= newy < rows:
+        if 0 <= newx < columns and 0 <= newy < rows: # checks if in maze
             if not cell.walls[wall]:
                 neighbours.append(maze[newx][newy])
     return neighbours
 
 
 pygame.init()
-
+# Pygame Screen Setup and Variables
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 maze_size = 10
@@ -362,6 +399,8 @@ clock = pygame.time.Clock()
 main_font = pygame.font.SysFont("OCR A EXTENDED", 50)
 font_small = pygame.font.SysFont("OCR A EXTENDED", 32)
 font_big = pygame.font.SysFont("OCR A EXTENDED", 60)
+
+# Variables
 
 running = True
 state = "start"
@@ -381,45 +420,58 @@ name_active = False
 name_submitted = False
 random_controls = False
 control_map = {}
+# maze creation
+maze = []
 
-maze = [[Cell(x,y) for y in range(rows)] for x in range(columns)]
+for x in range(columns):
+    column = []
+    for y in range(rows):
+        cell = Cell(x, y)
+        column.append(cell)
+    maze.append(column)
+
 user = User()
 finish = Finish()
 generate_maze()
+
+# Buttons and Sliders
+
 btn = pygame.Surface((300,70))
 btn.fill((60,60,60))
 c = pygame.Surface((180,70))
 c.fill((50,50,50))
-
-
+big = pygame.Surface((550, 75))
+big.fill((60,60,60))
+tiny = pygame.Surface((120,50))
+tiny.fill((255,20,100))
 start_button = Button(btn,400,300,"START")
 difficulty_button = Button(btn,400,400,"SELECT AI")
 
-bfs_button = Button(btn,400,120,"BFS (Easy)")
-dfs_button = Button(btn,400,280,"DFS (Hard)")
-dijkstra_button = Button(btn,400,200,"DIJKSTRA (Medium)")
+bfs_button = Button(big,400,120,"BFS (Easy)")
+dfs_button = Button(big,400,280,"DFS (Hard)")
+dijkstra_button = Button(big,400,200,"DIJKSTRA (Medium)")
 size5_btn  = Button(c, 100, 520, "5x5")
 size8_btn  = Button(c, 300, 520, "8x8")
 size10_btn = Button(c, 500, 520, "10x10")
 size20_btn = Button(c, 700, 520, "20x20")
-random_button = Button(btn, 700, 100, "??? OFF")
-back_button = Button(btn,400,650,"BACK")
-leaderboard_button = Button(btn,400,560,"LEADERBOARD")
-view_route_button = Button(btn, 400, 460, "VIEW AI ROUTE")
+random_button = Button(tiny, 710, 55, "OFF")
+back_button = Button(c,400,650,"BACK")
+leaderboard_button = Button(big,400,560,"LEADERBOARD")
+view_route_button = Button(big, 400, 460, "VIEW AI ROUTE")
 
 slider = Slider(250,380,300,1,60,30)
 
 racer = None
 
-# ---------------- MAIN LOOP ----------------
+# Main Loop
 
 while running:
-    # ------------------- EVENT HANDLING -------------------
+    # Event Handling
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
             running = False
 
-        # ---------------- START SCREEN ----------------
+        # Start Screen
         if state == "start" and e.type == pygame.MOUSEBUTTONDOWN:
             if difficulty_button.check(e.pos):
                 state = "difficulty"
@@ -427,26 +479,21 @@ while running:
                 racer = AlgorithmRacer(current_algorithm)
                 start_time = time.time()
                 just_started = True
-                if random_controls:
+                if random_controls: # Randomly shuffles the arrow keys if enabled.
                     keys = [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
-                    shuffled = keys[:]
+                    shuffled = keys[:] # This creates a copy of the list to have seperate values
                     random.shuffle(shuffled)
-                    control_map = {
-                        pygame.K_UP: shuffled[0],
-                        pygame.K_DOWN: shuffled[1],
-                        pygame.K_LEFT: shuffled[2],
-                        pygame.K_RIGHT: shuffled[3]
-                    }
+                    control_map = {pygame.K_UP: shuffled[0],pygame.K_DOWN: shuffled[1],pygame.K_LEFT: shuffled[2],pygame.K_RIGHT: shuffled[3]} # Maps control inputs to different keys
                 else:
                     control_map = {}
                 state = "race"
                 ai_started = False
                 score_saved = False
 
-        # ---------------- DIFFICULTY SCREEN ----------------
+        # Difficuulty Screen
         if state == "difficulty":
             slider.handle_event(e)
-            if e.type == pygame.MOUSEBUTTONDOWN:
+            if e.type == pygame.MOUSEBUTTONDOWN: # Identifies button presses
                 if bfs_button.check(e.pos):
                     current_algorithm = "BFS"
                     algorithm_selected = True
@@ -457,7 +504,7 @@ while running:
                     current_algorithm = "Dijkstra"
                     algorithm_selected = True
                 elif back_button.check(e.pos):
-                    delay = max(1, 60 - slider.value)
+                    delay = max(1, 60 - slider.value) # maps slider to a delay for the algorithm 
                     difficulty_selected = True
                     state = "start"
                 elif size5_btn.check(e.pos):
@@ -469,9 +516,9 @@ while running:
                 elif size20_btn.check(e.pos):
                     rebuild_maze(20)
                 elif random_button.check(e.pos):
-                    random_controls = not random_controls
+                    random_controls = not random_controls # Swaps mode of button
 
-        # ---------------- RACE SCREEN ----------------
+        # Race Screen
         if state == "race" and e.type == pygame.KEYDOWN:
             moved = False
             key = e.key
@@ -499,17 +546,23 @@ while running:
                 ai_started = True
                 start_time = time.time()
 
-        # ---------------- MENU SCREEN ----------------
+        # Menu Screen
         # Handles name input if player won
         if state == "menu" and winner == "You" and not score_saved:
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_RETURN:
                     # Save score and go straight to leaderboard
-                    save_score(player_name if player_name else "Anonymous", total_time)
+                    if player_name:
+                        name_to_save = player_name
+                    else:
+                        name_to_save = "Anonymous"
+
+                    # Save the score
+                    save_score(name_to_save, total_time)
                     score_saved = True
                     state = "leaderboard"
                 elif e.key == pygame.K_BACKSPACE:
-                    player_name = player_name[:-1]
+                    player_name = player_name[:-1] # Removes a character from name
                 else:
                     if len(player_name) < 10:
                         player_name += e.unicode
@@ -522,34 +575,53 @@ while running:
                 reset_game()
                 state = "start"
                 winner = None
-                player_name = ""
+                player_name = "" 
             elif view_route_button.check(e.pos):
                 state = "route_view"
 
-        # ---------------- LEADERBOARD SCREEN ----------------
+        # Leaderboard Screen
         if state == "leaderboard" and e.type == pygame.MOUSEBUTTONDOWN:
             if back_button.check(e.pos):
                 state = "menu"  # Returning from leaderboard shows menu without textbox
 
-        # ---------------- AI ROUTE VIEW ----------------
+        # Algorithm Route View
         if state == "route_view" and e.type == pygame.MOUSEBUTTONDOWN:
             if back_button.check(e.pos):
                 state = "menu"
 
 
-    # ------------------- DRAWING -------------------
+    # Drawing
     screen.fill((0, 0, 0))
 
-    # --------------- START SCREEN -----------------
+    # Start Screen
     if state == "start":
         screen.blit(font_big.render("Algorithm Racer", True, (255, 255, 255)), (100, 50))
-        start_button.draw()
+        screen.blit(font_small.render("Get to the server before the virus!", True, (255, 255, 255)), (SCREEN_WIDTH//2 - 345, 130))
+
+        # Determine if Start button is active
+        start_active = difficulty_selected and algorithm_selected
+
+        if start_active:
+            start_button.draw()
+        else:
+            # Draw crossed out style
+            crossed_surface = start_button.image.copy()
+            crossed_surface.fill((100, 100, 100))
+            screen.blit(crossed_surface, start_button.rect)
+            screen.blit(start_button.text, start_button.text_rect)
+            # Optional: draw X lines
+            pygame.draw.line(screen, (255, 0, 0), start_button.rect.topleft, start_button.rect.bottomright, 4)
+            pygame.draw.line(screen, (255, 0, 0), start_button.rect.topright, start_button.rect.bottomleft, 4)
+            # Display message
+            screen.blit(font_small.render("Select algorithm & maze size to begin.", True, (255, 50, 50)), (SCREEN_WIDTH//2 - 345, start_button.rect.bottom - 150))
         difficulty_button.draw()
 
-    # --------------- DIFFICULTY SCREEN -----------------
+    # Difficulty Screen
     elif state == "difficulty":
-        screen.blit(font_small.render(f"Current Algorithm: {current_algorithm}", True, (255, 255, 255)), (80, 30))
+        #UI drawing
+        screen.blit(font_small.render(f"Current Algorithm: {current_algorithm}", True, (255, 255, 255)), (130, 30))
         screen.blit(font_small.render(f"Maze Size: {maze_size}x{maze_size}", True, (255, 255, 255)), (240, 420))
+        screen.blit(font_small.render(f"RANDOMISE", True, (255, 255, 255)), (620, 0))
         size5_btn.draw()
         size8_btn.draw()
         size10_btn.draw()
@@ -559,21 +631,21 @@ while running:
         dijkstra_button.draw()
         slider.draw()
         back_button.draw()
-        # Update ??? button
+        # Update Random button
         if random_controls:
-            random_button.text = main_font.render("??? ON", True, (255, 255, 255))
+            random_button.text = main_font.render("ON", True, (255, 255, 255))
         else:
-            random_button.text = main_font.render("??? OFF", True, (255, 255, 255))
+            random_button.text = main_font.render("OFF", True, (255, 255, 255))
         random_button.text_rect = random_button.text.get_rect(center=random_button.rect.center)
         random_button.draw()
         screen.blit(font_small.render(f"Algorithm Speed: {slider.value}", True, (255, 255, 255)), (215, 330))
 
-    # --------------- RACE SCREEN -----------------
+    # Race Screen
     elif state == "race":
         for col in maze:
             for c in col:
                 c.draw()
-        if ai_started:
+        if ai_started: # Waits for user to move before starting
             racer.step()
         racer.draw()
         finish.draw()
@@ -591,10 +663,10 @@ while running:
             winner = current_algorithm
             state = "menu"
 
-    # --------------- MENU SCREEN -----------------
+    # Menu Screen
     elif state == "menu":
         # Display winner and time
-        screen.blit(font_big.render(f"{winner} Won!", True, (255, 255, 255)), (250, 200))
+        screen.blit(font_big.render(f"{winner} Won!", True, (255, 255, 255)), (285 - (10*len(winner)), 200))
         screen.blit(font_small.render(f"Time: {total_time:.2f}s", True, (255, 255, 255)), (300, 260))
 
         # Only draw textbox if player won and hasn't submitted name
@@ -608,22 +680,22 @@ while running:
         leaderboard_button.draw()
         back_button.draw()
 
-    # --------------- ROUTE VIEW SCREEN -----------------
+    # Route View Screen
     elif state == "route_view":
         for col in maze:
             for c in col:
                 c.draw()
         racer.draw()
         finish.draw()
-        screen.blit(font_big.render("AI Route", True, (255, 255, 255)), (300, 40))
-        screen.blit(font_big.render(f"Moves: {len(racer.path)}", True, (255, 255, 255)), (300, 140))
+        screen.blit(font_big.render(f"{current_algorithm} Route", True, (0, 255, 0)), (285 - (10*len(winner)), 40))
+        screen.blit(font_big.render(f"Moves: {len(racer.path)}", True, (0, 255, 0)), (285 - (10*len(winner)), 140))
         back_button.draw()
 
-    # --------------- LEADERBOARD SCREEN -----------------
+    # Leaderboard Screen
     elif state == "leaderboard":
         screen.blit(font_big.render(f"{maze_size}x{maze_size} Leaderboard", True, (255, 215, 0)), (160, 80))
         y = 170
-        for i, (n, t) in enumerate(read_leaderboard()[:10], 1):
+        for i, (n, t) in enumerate(read_leaderboard()[:10], 1): # Enumerate links witha number value, creates the list of top 10 ([:10])
             screen.blit(font_small.render(f"{i}. {n} - {t:.2f}s", True, (255, 255, 255)), (200, y))
             y += 35
         back_button.draw()
