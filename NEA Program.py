@@ -203,16 +203,16 @@ class Cell(GridObject):
         self.walls = [True, True, True, True]
 
     def draw(self):
-        px = self.x*CELL_SIZE
-        py = self.y*CELL_SIZE
+        position_x = self.x*CELL_SIZE
+        position_y = self.y*CELL_SIZE
         if self.walls[0]:
-            pygame.draw.line(screen,(255,255,255),(px,py),(px+CELL_SIZE,py),2)
+            pygame.draw.line(screen,(255,255,255),(position_x,position_y),(position_x+CELL_SIZE,position_y),2)
         if self.walls[1]:
-            pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py),(px+CELL_SIZE,py+CELL_SIZE),2)
+            pygame.draw.line(screen,(255,255,255),(position_x+CELL_SIZE,position_y),(position_x+CELL_SIZE,position_y+CELL_SIZE),2)
         if self.walls[2]:
-            pygame.draw.line(screen,(255,255,255),(px+CELL_SIZE,py+CELL_SIZE),(px,py+CELL_SIZE),2)
+            pygame.draw.line(screen,(255,255,255),(position_x+CELL_SIZE,position_y+CELL_SIZE),(position_x,position_y+CELL_SIZE),2)
         if self.walls[3]:
-            pygame.draw.line(screen,(255,255,255),(px,py+CELL_SIZE),(px,py),2)
+            pygame.draw.line(screen,(255,255,255),(position_x,position_y+CELL_SIZE),(position_x,position_y),2)
 
 class ImageObject(GridObject):
     def __init__(self, x, y, image_path, size_offset=0):
@@ -236,15 +236,15 @@ class User(ImageObject):
         
 
 
-    def move(self, dx, dy):
+    def move(self, change_x, change_y): # Direction changes and movement
         cell = maze[self.x][self.y]
-        if dx == -1 and not cell.walls[3]:
+        if change_x == -1 and not cell.walls[3]: # Checks there is no walls in the way
             self.x -= 1
-        if dx == 1 and not cell.walls[1]:
+        if change_x == 1 and not cell.walls[1]: # right
             self.x += 1
-        if dy == -1 and not cell.walls[0]:
+        if change_y == -1 and not cell.walls[0]: # down
             self.y -= 1
-        if dy == 1 and not cell.walls[2]:
+        if change_y == 1 and not cell.walls[2]: # up
             self.y += 1
         self.update_rect() # Keeps rect in sync
 
@@ -274,12 +274,12 @@ def read_leaderboard():
         file = open(leaderboard_file(), "r")
         for line in file:
             line = line.strip()              # Remove newline characters
-            n, t = line.split(",")           # Split name and time
-            scores.append((n, float(t)))     # Add tuple (name, time) to list
+            name, time_taken = line.split(",")           # Split name and time
+            scores.append((name, float(time_taken)))     # Add tuple (name, time) to list
         file.close()
 
         # Sort the scores by time in ascending order
-        scores.sort(key=lambda entry: entry[1])
+        scores.sort(key=lambda entry: entry[1]) # Complicated - Lambda can sort in terms of times
     except:
         # If the file doesn't exist or can't be read, do nothing
         pass
@@ -331,7 +331,7 @@ def rebuild_maze(size):
             column.append(cell)
         maze.append(column)
     generate_maze()
-
+    # Initiation of objects
     user = User()
     finish = Finish()
     
@@ -342,8 +342,7 @@ def reset_game():
     Resets the game without changing the maze size.
     """
 
-    global maze, user, finish, racer, winner, start_time
-    global ai_started, score_saved, random_controls, control_map
+    global maze, user, finish, racer, winner, race_start_time, ai_started, score_saved, random_controls, control_map
 
     # Reset every cell in the maze
     for x in range(columns):
@@ -362,7 +361,7 @@ def reset_game():
     ai_started = False
     racer = None
     winner = None
-    start_time = 0
+    race_start_time = 0
     score_saved = False
     random_controls = False
     control_map = {}
@@ -412,7 +411,7 @@ delay = 30
 ai_started = False
 score_saved = False
 winner = None
-start_time = 0
+race_start_time = 0
 total_time = 0
 just_started = False
 player_name = ""
@@ -420,7 +419,7 @@ name_active = False
 name_submitted = False
 random_controls = False
 control_map = {}
-# maze creation
+# Maze Creation
 maze = []
 
 for x in range(columns):
@@ -429,7 +428,7 @@ for x in range(columns):
         cell = Cell(x, y)
         column.append(cell)
     maze.append(column)
-
+# Initiate objects
 user = User()
 finish = Finish()
 generate_maze()
@@ -477,7 +476,7 @@ while running:
                 state = "difficulty"
             elif start_button.check(e.pos) and difficulty_selected and algorithm_selected:
                 racer = AlgorithmRacer(current_algorithm)
-                start_time = time.time()
+                race_start_time = time.time()
                 just_started = True
                 if random_controls: # Randomly shuffles the arrow keys if enabled.
                     keys = [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
@@ -544,7 +543,7 @@ while running:
             # Start AI timing when player moves for first time
             if moved and not ai_started:
                 ai_started = True
-                start_time = time.time()
+                race_start_time = time.time()
 
         # Menu Screen
         # Handles name input if player won
@@ -609,7 +608,7 @@ while running:
             crossed_surface.fill((100, 100, 100))
             screen.blit(crossed_surface, start_button.rect)
             screen.blit(start_button.text, start_button.text_rect)
-            # Optional: draw X lines
+            # draws X lines
             pygame.draw.line(screen, (255, 0, 0), start_button.rect.topleft, start_button.rect.bottomright, 4)
             pygame.draw.line(screen, (255, 0, 0), start_button.rect.topright, start_button.rect.bottomleft, 4)
             # Display message
@@ -654,12 +653,12 @@ while running:
 
         # Check for win conditions
         if user.rect.colliderect(finish.rect) and winner is None and not just_started:
-            total_time = time.time() - start_time
+            total_time = time.time() - race_start_time
             winner = "You"
             # Menu will now show textbox for name entry
             state = "menu"
         elif racer.goal in racer.visited and winner is None:
-            total_time = time.time() - start_time
+            total_time = time.time() - race_start_time
             winner = current_algorithm
             state = "menu"
 
@@ -695,8 +694,8 @@ while running:
     elif state == "leaderboard":
         screen.blit(font_big.render(f"{maze_size}x{maze_size} Leaderboard", True, (255, 215, 0)), (160, 80))
         y = 170
-        for i, (n, t) in enumerate(read_leaderboard()[:10], 1): # Enumerate links witha number value, creates the list of top 10 ([:10])
-            screen.blit(font_small.render(f"{i}. {n} - {t:.2f}s", True, (255, 255, 255)), (200, y))
+        for i, (name, time_taken) in enumerate(read_leaderboard()[:10], 1): # Enumerate links witha number value, creates the list of top 10 ([:10])
+            screen.blit(font_small.render(f"{i}. {name} - {time_taken:.2f}s", True, (255, 255, 255)), (200, y))
             y += 35
         back_button.draw()
 
